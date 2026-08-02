@@ -311,6 +311,7 @@ Double-click icon → show MainWindow.
 **Output**: `src/Core/Profiles/ForegroundWatcher.cs`, wiring di `App.OnStartup`.
 **Done when**: launch game dengan executable `game.exe` yang ada di profile → app auto-load profile tersebut dalam <3 detik. Switch ke window lain (browser, explorer) → profile tetap (tidak auto-unload). Switch balik ke game → profile masih loaded.
 **Depends on**: T5, T9, T16.
+**Status**: ✅ DONE (commit T25, verified --selfcheck-t25)
 
 ---
 

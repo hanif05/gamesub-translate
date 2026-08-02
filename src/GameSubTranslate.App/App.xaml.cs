@@ -5,6 +5,7 @@ using GameSubTranslate.App.Overlay;
 using GameSubTranslate.App.Settings;
 using GameSubTranslate.Config;
 using GameSubTranslate.Hotkeys;
+using GameSubTranslate.Profiles;
 using GameSubTranslate.Storage;
 using Hardcodet.Wpf.TaskbarNotification;
 using WinForms = System.Windows.Forms;
@@ -18,6 +19,7 @@ public partial class App : System.Windows.Application
     private MainWindow? _main;
     private SettingsWindow? _settingsWindow;
     private TaskbarIcon? _tray;
+    private ForegroundWatcher? _fgWatcher;
     private AppSettings _settings = new();
 
     protected override void OnStartup(System.Windows.StartupEventArgs e)
@@ -40,6 +42,13 @@ public partial class App : System.Windows.Application
         RegisterHotkeys(_settings);
 
         InitTray();
+
+        // T25: auto-load profile when a matching game window comes to the foreground.
+        _fgWatcher = new ForegroundWatcher(
+            foreground: ForegroundWatcher.GetForegroundExe,
+            profiles: () => new ProfileRepository(new Database()).GetAll(),
+            onProfileLoaded: AutoLoadProfile);
+        _fgWatcher.Start();
 
         // T24: closing the main window hides it (app keeps running in the tray).
         _main.Closing += (_, e) =>
@@ -73,6 +82,17 @@ public partial class App : System.Windows.Application
         _tray.ContextMenu = menu;
 
         _tray.TrayMouseDoubleClick += (_, _) => ShowMainWindow();
+    }
+
+    /// <summary>T25: foreground game matched → select its profile (first-match). Won't rebuild an already-running pipeline mid-game.</summary>
+    private void AutoLoadProfile(int profileId)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (_main is null) return;
+            if (_main.ActiveProfileId() == profileId) return; // already active, nothing to do
+            _main.SelectProfile(profileId);
+        });
     }
 
     private void ShowMainWindow()
@@ -150,6 +170,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _fgWatcher?.Dispose();
         _hotkeys?.Dispose();
         _main?.Dispose();
         _tray?.Dispose();

@@ -10,6 +10,8 @@ using GameSubTranslate.Config;
 using GameSubTranslate.Hotkeys;
 using GameSubTranslate.Ocr;
 using GameSubTranslate.Pipeline;
+using GameSubTranslate.Profiles;
+using GameSubTranslate.Storage;
 using GameSubTranslate.Translation;
 
 namespace GameSubTranslate.App;
@@ -28,6 +30,7 @@ internal static class SelfChecks
         "--selfcheck-t19" => SelfCheckT19(),
         "--selfcheck-t22" => SelfCheckT22(),
         "--selfcheck-t23" => SelfCheckT23(),
+        "--selfcheck-t25" => SelfCheckT25(),
         _ => SelfCheckT14(),
     };
 
@@ -229,6 +232,84 @@ internal static class SelfChecks
         Console.WriteLine(fails == 0
             ? "PASS: SettingsWindow tabs + hotkey format + settings round-trip"
             : $"FAIL: {fails} settings checks failed");
+        return fails == 0 ? 0 : 1;
+    }
+
+    private static int SelfCheckT25()
+    {
+        int fails = 0;
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        // Watcher logic: simulated foreground exe → matching profile (case-insensitive) fires onProfileLoaded.
+        var profiles = new[]
+        {
+            new GameProfile { Id = 1, Name = "Game A", ExecutableName = "game_a.exe" },
+            new GameProfile { Id = 2, Name = "Game B", ExecutableName = "" },
+            new GameProfile { Id = 3, Name = "Game C", ExecutableName = "other.exe" },
+        };
+        var loaded = new List<int>();
+        using (var watcher = new ForegroundWatcher(
+                   foreground: () => "Game_A.EXE",
+                   profiles: () => profiles,
+                   onProfileLoaded: id => loaded.Add(id)))
+        {
+            watcher.Start(intervalMs: 1000);
+            Thread.Sleep(1200); // one poll fires
+        }
+        Check(loaded.SequenceEqual(new[] { 1 }), $"expected profile 1 loaded, got [{string.Join(",", loaded)}]");
+
+        // Same exe twice → fires once (transition-only).
+        loaded.Clear();
+        using (var watcher = new ForegroundWatcher(
+                   foreground: () => "game_a.exe",
+                   profiles: () => profiles,
+                   onProfileLoaded: id => loaded.Add(id)))
+        {
+            watcher.Start(intervalMs: 100);
+            Thread.Sleep(350); // ~3 polls, same exe → only first fires
+        }
+        Check(loaded.SequenceEqual(new[] { 1 }), $"transition-only failed: [{string.Join(",", loaded)}]");
+
+        // No match → nothing fires.
+        loaded.Clear();
+        using (var watcher = new ForegroundWatcher(
+                   foreground: () => "unknown.exe",
+                   profiles: () => profiles,
+                   onProfileLoaded: id => loaded.Add(id)))
+        {
+            watcher.Start(intervalMs: 100);
+            Thread.Sleep(250);
+        }
+        Check(loaded.Count == 0, $"no-match fired {loaded.Count} time(s)");
+
+        // GetForegroundExe returns a real process name in this environment.
+        var fg = ForegroundWatcher.GetForegroundExe();
+        Check(!string.IsNullOrWhiteSpace(fg), $"GetForegroundExe returned '{fg}'");
+
+        // MainWindow.SelectProfile wires the selection (via temp DB, no DB pollution).
+        // Note: MainWindow restores the last-active profile from AppSettings on construction,
+        // so we don't assert a null start — just that SelectProfile lands on the target id.
+        var dir = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t25-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var db = new Database(Path.Combine(dir, "profiles.db"));
+        db.EnsureSchema();
+        var repo = new ProfileRepository(db);
+        int pid = repo.Create(new GameProfile { Name = "Sel", ExecutableName = "sel.exe" });
+        var w = new MainWindow(db, owner: null);
+        w.SelectProfile(pid);
+        Check(w.ActiveProfileId() == pid, $"SelectProfile failed (id {w.ActiveProfileId()})");
+        w.Close();
+        try { Directory.Delete(dir, recursive: true); }
+        catch (IOException) { /* file still locked this run — harmless */ }
+
+        Console.WriteLine(fails == 0
+            ? "PASS: ForegroundWatcher exe->profile + MainWindow.SelectProfile"
+            : $"FAIL: {fails} auto-load checks failed");
         return fails == 0 ? 0 : 1;
     }
 

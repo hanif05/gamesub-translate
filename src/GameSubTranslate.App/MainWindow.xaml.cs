@@ -96,6 +96,28 @@ public partial class MainWindow : Window
 
     private GameProfile? Selected => ProfileList.SelectedItem as GameProfile;
 
+    /// <summary>T25: current active profile id (null if none).</summary>
+    public int? ActiveProfileId() => _service.ActiveProfileId;
+
+    /// <summary>T25: select a profile programmatically (auto-load from foreground watcher).</summary>
+    public void SelectProfile(int profileId)
+    {
+        var profiles = ProfileList.Items.Cast<GameProfile>().ToList();
+        int idx = profiles.FindIndex(p => p.Id == profileId);
+        if (idx >= 0)
+        {
+            ProfileList.SelectedIndex = idx;
+            // WPF suppresses re-selection of the already-selected index → SelectionChanged
+            // won't fire. Set the service state explicitly so repeated auto-loads are idempotent.
+            _service.SetActiveProfile(profileId);
+            RefreshRegions();
+        }
+        else
+        {
+            Refresh(); // profile list stale (created/deleted elsewhere) → reload + try select
+        }
+    }
+
     private void New_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new ProfileEditWindow { Owner = this };
