@@ -3,9 +3,9 @@ using GameSubTranslate.Ocr;
 using GameSubTranslate.Pipeline;
 using GameSubTranslate.Prototype;
 
-if (args.Length > 0 && args[0] == "--selfcheck-t3")
+if (args.Length > 0 && args[0].StartsWith("--selfcheck"))
 {
-    return SelfChecks.Run();
+    return SelfChecks.Run(args[0]);
 }
 
 var cli = CliArgsParser.Parse(args);
