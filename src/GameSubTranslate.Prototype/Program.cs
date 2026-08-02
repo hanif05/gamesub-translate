@@ -3,6 +3,11 @@ using GameSubTranslate.Ocr;
 using GameSubTranslate.Pipeline;
 using GameSubTranslate.Prototype;
 
+if (args.Length > 0 && args[0] == "--selfcheck-t3")
+{
+    return SelfChecks.Run();
+}
+
 var cli = CliArgsParser.Parse(args);
 var cfg = AppConfig.FromEnv();
 using var ocr = new TesseractOcrEngine();
@@ -15,3 +20,4 @@ Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 var pipeline = new TranslatePipeline(cli.X, cli.Y, cli.W, cli.H, cli.IntervalMs, ocr, cfg);
 await pipeline.RunAsync(cts.Token);
 Console.WriteLine("stopped.");
+return 0;
