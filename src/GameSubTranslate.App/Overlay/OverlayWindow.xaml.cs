@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Threading;
 using GameSubTranslate.Config;
 using MouseEventHandler = System.Windows.Input.MouseEventHandler;
 using MouseButtonEventHandler = System.Windows.Input.MouseButtonEventHandler;
@@ -123,6 +124,59 @@ public partial class OverlayWindow : Window
 
     public void HideOverlay() => Hide();
 
+    // ---- Direct drag (hold Shift + move cursor over the overlay). No click needed: the overlay is
+    // click-through (WS_EX_TRANSPARENT) so WPF mouse events never fire — we poll instead.
+    private readonly DispatcherTimer _moveTimer = new() { Interval = TimeSpan.FromMilliseconds(33) };
+    private bool _moving;
+
+    private void TickMove()
+    {
+        if (!IsVisible || !Win32.IsKeyDown(Win32.VK_SHIFT))
+        {
+            FinishMove();
+            return;
+        }
+
+        if (!_moving)
+        {
+            if (!CursorInsideOverlay()) return; // wait until cursor is on the overlay
+            _moving = true;
+            SetClickThrough(false);
+        }
+        else
+        {
+            var (cx, cy) = Win32.GetCursorPos();
+            Left = cx - Width / 2;
+            Top = cy - Height / 2;
+        }
+    }
+
+    private void FinishMove()
+    {
+        if (!_moving) return;
+        _moving = false;
+        SetClickThrough(true);
+        _settings.OverlayX = Left;
+        _settings.OverlayY = Top;
+        new SettingsStore().Save(_settings);
+    }
+
+    private bool CursorInsideOverlay()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        Win32.GetWindowRect(hwnd, out var r);
+        var (cx, cy) = Win32.GetCursorPos();
+        return cx >= r.Left && cx <= r.Right && cy >= r.Top && cy <= r.Bottom;
+    }
+
+    /// <summary>Clears (false) or restores (true) WS_EX_TRANSPARENT so the overlay stops/starts passing clicks through.</summary>
+    private void SetClickThrough(bool on)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        int style = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+        Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, on ? style | Win32.WS_EX_TRANSPARENT : style & ~Win32.WS_EX_TRANSPARENT);
+    }
+
     public void ShowText(string text)
     {
         ViewModel.ShowText(text);
@@ -135,5 +189,15 @@ public partial class OverlayWindow : Window
         var hwnd = new WindowInteropHelper(this).Handle;
         var style = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
         Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, style | Win32.WS_EX_LAYERED | Win32.WS_EX_TRANSPARENT);
+
+        _moveTimer.Tick += (_, _) => TickMove();
+        _moveTimer.Start();
+    }
+
+    /// <summary>Click-through is a window style; restore it if we ever suspended it.</summary>
+    protected override void OnClosed(EventArgs e)
+    {
+        _moveTimer.Stop();
+        base.OnClosed(e);
     }
 }
