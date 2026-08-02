@@ -49,12 +49,14 @@ Kode `OcrEngine`, `ChangeDetector`, `TranslationClient`, `Config/AppConfig` dari
 Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype → Core kalau Prototype masih mau jalan independen untuk testing.
 **Output**: solution build OK dengan 3 project, `Prototype` masih bisa run seperti Fase 1.
 **Done when**: `dotnet build` dari root sukses 0 error. `dotnet run --project src/GameSubTranslate.Prototype -- --x 0 --y 0 --w 100 --h 100` masih jalan seperti Fase 1.
+**Status**: ✅ DONE (commit 5082aec)
 **Depends on**: —
 
 #### T2. WPF App skeleton
 **Deskripsi**: Di `GameSubTranslate.App`, bikin `App.xaml` (tanpa StartupUri) + `MainWindow.xaml` (placeholder `<TextBlock Text="GameSubTranslate"/>`). Override `OnStartup` di `App.xaml.cs` untuk show `MainWindow`. Set `ShutdownMode=OnExplicitShutdown` (window lain seperti overlay & region-selector akan handle lifecycle sendiri).
 **Output**: `src/GameSubTranslate.App/App.xaml`, `MainWindow.xaml`, window muncul saat run.
 **Done when**: `dotnet run --project src/GameSubTranslate.App` launch WPF window dengan text "GameSubTranslate" terlihat.
+**Status**: ✅ DONE (T1 commit 5082aec sudah include App skeleton; verified window stays up)
 **Depends on**: T1.
 
 #### T3. Settings model + DPAPI-encrypted config file
@@ -68,6 +70,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 - Run app, set API key via `SettingsStore`, restart, key terbaca kembali.
 - Buka file `settings.json` manual — field `ApiKey` terlihat sebagai base64 blob, bukan plaintext.
 - Kalau file corrupt / hilang → `Load()` return default `AppSettings` baru, bukan crash.
+**Status**: ✅ DONE (commit 2a41024, verified --selfcheck-t3)
 **Depends on**: T1.
 
 #### T4. SQLite + Dapper: schema + migration
@@ -80,6 +83,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 - `Database` class: buka connection, jalankan `EnsureSchema()` sekali di startup. Pakai `SqliteConnection` per-query (Dapper style, simple).
 **Output**: file `src/Core/Storage/Database.cs`, `Migrations/Schema.sql` (atau inline string di C#).
 **Done when**: app startup dengan folder `%APPDATA%/GameSubTranslate/` kosong → file `profiles.db` terbuat dengan 3 tabel. Pakai `sqlite3` CLI (atau DB Browser for SQLite) verify schema.
+**Status**: ✅ DONE (commit 09fa7f4, verified --selfcheck-t4)
 **Depends on**: T1.
 
 ---
@@ -93,6 +97,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 - Validation minimal: `Name` non-empty, `ExecutableName` optional.
 **Output**: file `src/Core/Profiles/GameProfile.cs`, `CaptureRegion.cs`, `ProfileRepository.cs`.
 **Done when**: dari quick test di `Program.cs` console, bisa create profile + 2 region, GetAll return list benar, update nama, delete. DB row count sesuai.
+**Status**: ✅ DONE (commit f672889, verified --selfcheck-t5)
 **Depends on**: T4.
 
 #### T6. MainWindow: profile list + create/edit/delete
@@ -100,24 +105,28 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: file `src/App/MainWindow.xaml(.cs)`, `ProfileEditWindow.xaml(.cs)`.
 **Done when**: create profile via UI, restart app, profile masih ada. Delete bekerja, row hilang dari DB.
 **Depends on**: T2, T3, T5.
+**Status**: ✅ DONE (commit a81eeb3)
 
 #### T7. Region Selector: full-screen drag-select
 **Deskripsi**: Window baru `RegionSelectorWindow`. Saat dibuka, full-screen ke primary monitor (extend ke multi-monitor di T8), `WindowStyle=None`, `WindowState=Maximized`, `Topmost=true`, `Background=Transparent`, `AllowsTransparency=true`. Mouse cursor jadi crosshair, click+drag gambar rectangle semi-transparan (misal `Rectangle` dengan `Fill="#40FF0000"`), live update `Width/Height`. Tampilkan TextBlock kecil real-time dengan koordinat (x, y, w, h). ESC cancel, Enter/click kedua confirm. Saat confirm, return `CaptureRegion` ke caller via callback / `DialogResult`.
 **Output**: file `src/App/Regions/RegionSelectorWindow.xaml(.cs)`.
 **Done when**: dari `ProfileEditWindow` klik "Add Region" → RegionSelectorWindow muncul full-screen → drag rectangle di atas Notepad → confirm → koordinat muncul di form. Cancel dengan ESC tutup window tanpa save.
 **Depends on**: T6.
+**Status**: ✅ DONE (commit T7)
 
 #### T8. Multi-monitor support di Region Selector
 **Deskripsi**: Sebelum drag, kalau ada >1 monitor, tampilkan list monitor di top-bar RegionSelectorWindow (atau di step terpisah). User pilih monitor dulu, baru drag di monitor tersebut. Pakai `System.Windows.Forms.Screen.AllScreens` (WinForms interop) atau `Display.GetDisplays()` dari `Microsoft.Extensions.Hosting` — tapi yang paling simple: `System.Windows.Forms.Screen.AllScreens` (tambah `<UseWindowsForms>true</UseWindowsForms>` di `.csproj` App). Window RegionSelector diposisikan ke bounds monitor yang dipilih, drag di dalam bounds itu saja.
 **Output**: update `RegionSelectorWindow.xaml(.cs)`, simpan `MonitorIndex` di `CaptureRegion`.
 **Done when**: dengan 2 monitor, dropdown monitor muncul, pilih monitor 2 → window pindah ke monitor 2 → drag di sana → koordinat yang disimpan benar relatif ke virtual screen.
 **Depends on**: T7.
+**Status**: ✅ DONE (commit f13fbf3)
 
 #### T9. Region switcher aktif: switch region dalam 1 profile
 **Deskripsi**: Di MainWindow atau tray icon (T24), user bisa pilih region aktif dari dropdown list region di profile yang sedang loaded. Pilih region → simpan di memory (tidak perlu ke DB setiap kali, kecuali user klik "Save" — atau auto-save kalau simple). Hotkey untuk cycle region ditambahkan di T22.
 **Output**: dropdown region di MainWindow + method `ProfileService.SetActiveRegion(int regionId)`.
 **Done when**: profile dengan 2 region, pilih region A di dropdown → pipeline pakai koordinat A; pilih region B → koordinat B. Persist pilihan saat restart app (simpan di `AppSettings` atau tabel baru `LastActiveState`).
 **Depends on**: T6, T7.
+**Status**: ✅ DONE (commit db79db4, verified --selfcheck-t9)
 
 ---
 
@@ -133,6 +142,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: rewrite `src/Core/Capture/ScreenCapture.cs`.
 **Done when**: panggil `CaptureRegion(x, y, w, h)` dari test program, hasilnya PNG dengan dimensi sesuai region dan konten yang benar (compare dengan screenshot manual).
 **Depends on**: T1.
+**Status**: ✅ DONE (commit d6fde49, verified --selfcheck-t10 + CLI OCR)
 
 #### T11. Change detection: perceptual hash
 **Deskripsi**: Upgrade `ChangeDetector.cs`. Fase 1 pakai byte-compare (kurang robust). Fase 2: perceptual hash (pHash) 64-bit.
@@ -142,6 +152,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: update `src/Core/Pipeline/ChangeDetector.cs`.
 **Done when**: test synthetic pass: 100 identik calls semua return false; 100 calls dengan teks berganti 1 kata di tengah return true.
 **Depends on**: T10.
+**Status**: ✅ DONE (commit d6fde49, verified --selfcheck-t11)
 
 ---
 
@@ -160,6 +171,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 - Mock simulate 429 di attempt 1, success di attempt 2 → return translated text.
 - Mock simulate 401 → throw `TranslationException` setelah 1 attempt, no retry.
 **Depends on**: T1.
+**Status**: ✅ DONE (verified --selfcheck-t12)
 
 #### T13. Translation cache
 **Deskripsi**: Di Core, namespace `GameSubTranslate.Cache`. `TranslationCacheRepository`:
@@ -170,6 +182,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: file `src/Core/Cache/TranslationCacheRepository.cs`, integrasi di `TranslatePipeline`.
 **Done when**: translate "Hello" 2x → API call hanya 1x, kedua call dapat hasil yang sama dari cache. Verify dengan log HTTP request.
 **Depends on**: T4, T12.
+**Status**: ✅ DONE (verified --selfcheck-t13)
 
 ---
 
@@ -185,6 +198,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: file `src/App/Overlay/OverlayWindow.xaml(.cs)`, helper `Win32.cs` dengan `SetWindowLong` P/Invoke.
 **Done when**: app launch → overlay window muncul transparan (hanya background kosong kelihatan) di atas desktop, mouse click tembus ke window di belakangnya (test dengan Notepad di belakang overlay).
 **Depends on**: T2.
+**Status**: ✅ DONE (verified --selfcheck-t14)
 
 #### T15. Overlay text rendering + style settings
 **Deskripsi**: Di `OverlayWindow`, tambah `TextBlock` (atau `ContentControl` dengan `ScrollViewer` untuk teks panjang) yang bind ke `OverlayViewModel.Text`. Style:
@@ -196,6 +210,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: `src/App/Overlay/OverlayViewModel.cs`, update `OverlayWindow.xaml`.
 **Done when**: panggil `overlay.ShowText("Hello translated world")` dari test code → teks muncul styled sesuai settings. Ganti setting → restart app → style baru aktif.
 **Depends on**: T14, T3.
+**Status**: ✅ DONE (verified --selfcheck-t15)
 
 ---
 
@@ -206,12 +221,14 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: update `src/Core/Pipeline/TranslatePipeline.cs`.
 **Done when**: dari `MainWindow` klik "Start Pipeline" → loop berjalan di background, callback dipanggil tiap ada teks baru. Klik "Stop" → loop cancel bersih tanpa exception.
 **Depends on**: T10, T11, T12, T13.
+**Status**: ✅ DONE (commit a2d6ea4, verified --selfcheck-t16)
 
 #### T17. Pipeline pause/resume flag
 **Deskripsi**: Tambah `Pause()` / `Resume()` method di `TranslatePipeline`. Saat paused, loop tetap jalan tapi skip OCR+translate (capture tetap jalan supaya saat resume, frame terbaru langsung diproses — tidak ada backlog). Bind ke `AppSettings.HotkeyPauseCapture` di T20.
 **Output**: update `TranslatePipeline.cs`.
 **Done when**: start pipeline, panggil `Pause()` dari test code → API call berhenti muncul di log. Panggil `Resume()` → API call jalan lagi. Capture loop tetap aktif selama paused (verify dengan log internal).
 **Depends on**: T16.
+**Status**: ✅ DONE (verified --selfcheck-t17)
 
 ---
 
@@ -227,30 +244,35 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: file `src/Core/Hotkeys/GlobalHotkeyManager.cs`, `Win32.cs` (extend).
 **Done when**: register `Ctrl+Alt+T` → callback dipanggil saat tekan hotkey, meskipun MainWindow tidak focused. Unregister saat dispose → callback tidak dipanggil lagi.
 **Depends on**: T2.
+**Status**: ✅ DONE (verified --selfcheck-t18)
 
 #### T19. Hotkey: toggle overlay show/hide
 **Deskripsi**: Bind hotkey `AppSettings.HotkeyToggleOverlay` (default `Ctrl+Alt+T`) → `overlay.Show() / overlay.Hide()`. State overlay disimpan di memory, hide = `Visibility.Hidden` (bukan close, supaya state teks tetap).
 **Output**: wiring di `App.OnStartup`.
 **Done when**: tekan `Ctrl+Alt+T` saat main game window aktif → overlay muncul/hilang. State teks tidak reset.
 **Depends on**: T14, T15, T18.
+**Status**: ✅ DONE (verified --selfcheck-t19)
 
 #### T20. Hotkey: pause/resume capture
 **Deskripsi**: Bind `AppSettings.HotkeyPauseCapture` (default `Ctrl+Alt+P`) → `pipeline.Pause() / pipeline.Resume()`. Visual indicator kecil (icon di tray, lihat T24) update.
 **Output**: wiring di `App.OnStartup`.
 **Done when**: tekan `Ctrl+Alt+P` → pipeline pause (tidak ada log OCR/translate baru). Tekan lagi → resume.
 **Depends on**: T17, T18.
+**Status**: ✅ DONE (wiring App.OnStartup → MainWindow.TogglePause; hotkey mgr verified T18, pause/resume verified T17)
 
 #### T21. Hotkey: open settings panel
 **Deskripsi**: Bind `AppSettings.HotkeyOpenSettings` (default `Ctrl+Alt+S`) → show `SettingsWindow` (lihat T23) atau focus ke MainWindow.
 **Output**: wiring di `App.OnStartup`.
 **Done when**: tekan `Ctrl+Alt+S` saat game aktif → settings window muncul di foreground. ESC atau close → hilang.
 **Depends on**: T18, T23 (minimal placeholder settings window).
+**Status**: ✅ DONE (sejak T23: hotkey → SettingsWindow penuh, single-instance, reopen)
 
 #### T22. Hotkey: manual screenshot trigger
 **Deskripsi**: Bind `AppSettings.HotkeyManualCapture` (default `Ctrl+Alt+Space`) → trigger 1x capture pipeline (capture → ocr → translate → tampil di overlay) tanpa change detection. Method `Pipeline.CaptureOnce()` return `Task<string?>`.
 **Output**: update `TranslatePipeline.cs`, wiring di `App.OnStartup`.
 **Done when**: dengan pipeline paused atau capture area kosong, tekan `Ctrl+Alt+Space` → 1 translate result muncul di overlay. Tidak loop otomatis.
 **Depends on**: T16, T18.
+**Status**: ✅ DONE (pipeline.CaptureOnceAsync + `_captureLock` semaphore; hasil tampil di overlay; verified --selfcheck-t22)
 
 ---
 
@@ -269,6 +291,7 @@ Save → `SettingsStore.Save()`. Cancel → discard.
 **Output**: `src/App/Settings/SettingsWindow.xaml(.cs)`, `SettingsViewModel.cs`.
 **Done when**: buka settings, ganti API key, font, hotkey, language → restart app → semua setting persisten. Test Connection panggil API real dan return success kalau key valid.
 **Depends on**: T3, T5, T6, T18.
+**Status**: ✅ DONE (verified --selfcheck-t23: 6 tabs, hotkey Format round-trip, OverlayX/Y persisted, ApiKey DPAPI)
 
 #### T24. System tray icon
 **Deskripsi**: Pakai `Hardcodet.NotifyIcon.Wpf` (NuGet). `TaskbarIcon` di App, context menu:
@@ -281,12 +304,14 @@ Double-click icon → show MainWindow.
 **Output**: update `App.xaml`, `App.xaml.cs`.
 **Done when**: app jalan, icon muncul di system tray. Right-click → context menu → semua aksi bekerja. Close MainWindow (X) tidak keluar app, hanya hide. Pilih Exit → app fully shutdown.
 **Depends on**: T19, T20, T21, T23.
+**Status**: ✅ DONE (tray icon + context menu Show/Pause/Settings/Exit; close window → hide; Exit → shutdown. Verified: process alive after window close)
 
 #### T25. Auto-load profile by foreground executable
 **Deskripsi**: Pakai `Win32` `GetForegroundWindow` + `GetWindowThreadProcessId` + `QueryFullProcessImageName` untuk deteksi exe name foreground window. Background `Timer` di App cek tiap 2 detik. Kalau foreground exe match `ExecutableName` di salah satu profile → auto-load profile itu (set active region ke `IsActiveDefault`). Frontend window ke MainWindow atau settings window TIDAK trigger switch.
 **Output**: `src/Core/Profiles/ForegroundWatcher.cs`, wiring di `App.OnStartup`.
 **Done when**: launch game dengan executable `game.exe` yang ada di profile → app auto-load profile tersebut dalam <3 detik. Switch ke window lain (browser, explorer) → profile tetap (tidak auto-unload). Switch balik ke game → profile masih loaded.
 **Depends on**: T5, T9, T16.
+**Status**: ✅ DONE (commit T25, verified --selfcheck-t25)
 
 ---
 
@@ -309,6 +334,7 @@ Catat hasil di section "Hasil Verifikasi" di bawah file ini.
 **Output**: section "Hasil Verifikasi" + screenshot/log terlampir.
 **Done when**: semua 10 skenario di atas lulus + latency tercatat.
 **Depends on**: T1-T25.
+**Status**: ✅ DONE (verified 2026-08-02, lihat "Hasil Verifikasi" di bawah; 6 bug fix selama verifikasi)
 
 ---
 
@@ -351,7 +377,35 @@ Sesuai estimasi roadmap PRD 2-3 minggu, on track kalau tidak ada blocker tak ter
 
 ## Hasil Verifikasi (diisi saat T26 selesai)
 
-_(kosong — akan diisi di akhir fase)_
+**T26 — End-to-end manual verification** (2026-08-02, Windows 11, OpenRouter `inclusionai/ling-3.0-flash:free`, capture region di monitor 1, subtitle dari screenshot game).
+
+| # | Skenario | Hasil |
+|---|---|---|
+| 1 | API key valid → Test Connection | ✅ PASS — tampil "halo" |
+| 2 | New Profile + drag region di atas subtitle | ✅ PASS — region tersimpan, dipakai pipeline |
+| 3 | Overlay muncul dengan teks terjemahan | ✅ PASS — terjemahan tampil real-time |
+| 4 | Hotkeys: toggle overlay / pause / settings / manual capture | ✅ PASS — 1-3 berfungsi, `Ctrl+Alt+Space` manual capture 1x jalan (saat paused) |
+| 5 | Multi-region: tambah region kedua, switch via dropdown | ✅ PASS — setelah fix pipeline rebuild saat region switch |
+| 6 | Cache: teks sama 2x → 1 API call | ✅ PASS — log: "Enneleyn: Greetings..." API 1x (1765ms), hit berikutnya 0-1ms; `--selfcheck-t26` PASS |
+| 7 | Auto-load: foreground exe match profile → auto switch | ✅ PASS — pindah ke screenshot game → auto-load + translate dalam <3s |
+| 8 | Latency subtitle berubah → overlay | ✅ PASS — API call **~1.5–4.9 detik** (dominan waktu LLM), cache hit 0-1ms |
+| 9 | Change detection: subtitle diam 30 detik → no API call | ✅ PASS — status "dst:" cuma 1x, tidak spam; pindah gambar → "dst:" baru |
+| 10 | API key invalid → overlay tampil error, app tidak crash | ✅ PASS — `⚠ [translate-error]` di overlay, app tetap hidup |
+
+**Bug yang ditemukan & difix selama T26:**
+- **Tray icon tidak muncul** — `TaskbarIcon` tanpa `IconSource`, tidak ada file `.ico`. Fix: generate icon "GS" runtime di `App.InitTray()`.
+- **Overlay tidak auto-show** — dibuat tapi tidak di-show di `OnStartup`. Fix: `_overlay.ShowOverlay()` saat launch.
+- **Cancel/Save settings crash app** — `SettingsWindow` dibuka via `Show()` (non-modal) tapi tombol set `DialogResult` → WPF throw `InvalidOperationException`. Fix: non-modal pakai flag `Saved` property, bukan `DialogResult`.
+- **Region baru dapat koordinat region lama** — (1) `ProfileRepository.Update` delete-then-reinsert tidak re-set `r.Id` → `ActiveRegionId` stale; (2) edit profile tidak reset pipeline yang sudah jalan (masih pakai coords region lama). Fix: re-set `r.Id` di `Update()`, panggil `ResetPipeline()` saat region switch + edit + delete profile.
+- **Settings change tidak rebuild pipeline** — ganti API key/model lewat settings, pipeline lama masih pakai key lama. Fix: `ReloadSettings` → `ResetPipeline()`.
+- **"GraphicsCapture returned no frame"** — throw saat frame null → spam status tiap interval. Fix: return `Array.Empty<byte>()` (transient: screen off, monitor switch, frame-pool race).
+
+**Catatan:**
+- `--selfcheck-t26` ditambahkan (cache integration real SQLite, Prototype) — PASS.
+- Latency diukur via `[latency]` log di `TranslatePipeline.TranslateAsync` (tidak masuk commit? — sudah masuk sebagai instrumentasi kecil).
+- Provider `:free` model bisa rate-limit → API call gagal beruntun; bukan bug app (retry + overlay error sudah benar).
+
+**Kesimpulan:** Semua 10 skenario lulus. Fase 2 MVP overlay siap.
 
 ---
 

@@ -1,18 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>GameSubTranslate.Prototype</RootNamespace>
-    <AssemblyName>GameSubTranslate.Prototype</AssemblyName>
+    <RootNamespace>GameSubTranslate</RootNamespace>
+    <AssemblyName>GameSubTranslate.App</AssemblyName>
+    <UseWindowsForms>true</UseWindowsForms>
     <!-- Transitive from Core's Win2D → WindowsAppSDK; needed for `dotnet build` without VS. -->
     <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\GameSubTranslate.Core\GameSubTranslate.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
   </ItemGroup>
 
 </Project>

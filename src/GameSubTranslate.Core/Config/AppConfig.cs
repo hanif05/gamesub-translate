@@ -1,4 +1,4 @@
-namespace GameSubTranslate.Prototype.Config;
+namespace GameSubTranslate.Config;
 
 public sealed class AppConfig
 {

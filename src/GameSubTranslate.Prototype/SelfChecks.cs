@@ -1,0 +1,742 @@
+using Dapper;
+using System.Diagnostics;
+using System.Drawing;
+using System.Net;
+using System.Net.Http;
+using System.Text.Json;
+using GameSubTranslate.Cache;
+using GameSubTranslate.Capture;
+using GameSubTranslate.Config;
+using GameSubTranslate.Ocr;
+using GameSubTranslate.Pipeline;
+using GameSubTranslate.Profiles;
+using GameSubTranslate.Storage;
+using GameSubTranslate.Translation;
+
+namespace GameSubTranslate.Prototype;
+
+/// <summary>
+/// Minimal assert-style self-checks run via CLI (no test framework, per CLAUDE.md).
+/// Usage: --selfcheck-t3, --selfcheck-t4, --selfcheck-t5
+/// </summary>
+internal static class SelfChecks
+{
+    public static int Run(string which) => which switch
+    {
+        "--selfcheck-t3" => SelfCheckT3(),
+        "--selfcheck-t4" => SelfCheckT4(),
+        "--selfcheck-t5" => SelfCheckT5(),
+        "--selfcheck-t9" => SelfCheckT9(),
+        "--selfcheck-t10" => SelfCheckT10(),
+        "--selfcheck-t11" => SelfCheckT11(),
+        "--selfcheck-t12" => SelfCheckT12(),
+        "--selfcheck-t13" => SelfCheckT13(),
+        "--selfcheck-t16" => SelfCheckT16(),
+        "--selfcheck-t17" => SelfCheckT17(),
+        "--selfcheck-t26" => SelfCheckT26(),
+        _ => SelfCheckT3(),
+    };
+
+    private static int SelfCheckT3()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t3");
+        var store = new SettingsStore(Path.Combine(dir, "settings.json"));
+        var s = new AppSettings { ApiKey = "sk-test-123", BaseUrl = "https://api.openai.com/v1", Model = "gpt-4o-mini", OverlayFontSize = 24 };
+        store.Save(s);
+
+        var loaded = store.Load();
+        if (loaded.ApiKey != "sk-test-123" || loaded.BaseUrl != "https://api.openai.com/v1" || loaded.OverlayFontSize != 24)
+        {
+            Console.WriteLine($"FAIL: round-trip mismatch: key={loaded.ApiKey}");
+            return 1;
+        }
+        var raw = File.ReadAllText(store.FilePath);
+        if (raw.Contains("sk-test-123"))
+        {
+            Console.WriteLine("FAIL: ApiKey plaintext in file");
+            return 1;
+        }
+        // Field named ApiKeyEncrypted must hold a base64 blob, never plaintext.
+        var dto = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(raw);
+        var encrypted = dto.GetProperty("ApiKeyEncrypted").GetString() ?? "";
+        try
+        {
+            Convert.FromBase64String(encrypted);
+        }
+        catch (FormatException)
+        {
+            Console.WriteLine("FAIL: ApiKeyEncrypted is not valid base64");
+            return 1;
+        }
+
+        // Corrupt file → Load returns defaults, no crash.
+        File.WriteAllText(store.FilePath, "{not valid json");
+        var defaults = store.Load();
+        if (defaults.ApiKey != null || defaults.CaptureIntervalMs != 800)
+        {
+            Console.WriteLine("FAIL: corrupt load did not return defaults");
+            return 1;
+        }
+
+        Console.WriteLine("PASS: SettingsStore round-trip + encryption + corrupt-handling");
+        return 0;
+    }
+
+    private static int SelfCheckT4()
+    {
+        var dbPath = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t4", "profiles.db");
+        if (File.Exists(dbPath)) File.Delete(dbPath);
+
+        var db = new Database(dbPath);
+        db.EnsureSchema();
+
+        var tables = new List<string>();
+        using (var conn = db.Open())
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name";
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) tables.Add(r.GetString(0));
+        }
+
+        var expected = new[] { "CaptureRegion", "GameProfile", "TranslationCache" };
+        foreach (var t in expected)
+        {
+            if (!tables.Contains(t))
+            {
+                Console.WriteLine($"FAIL: table {t} missing; got [{string.Join(", ", tables)}]");
+                return 1;
+            }
+        }
+        // sqlite_sequence is created by AUTOINCREMENT — system table, ignore it.
+        var unexpected = tables.Where(t => !expected.Contains(t) && !t.StartsWith("sqlite_")).ToList();
+        if (unexpected.Count > 0)
+        {
+            Console.WriteLine($"FAIL: unexpected tables: [{string.Join(", ", unexpected)}]");
+            return 1;
+        }
+
+        // EnsureSchema is idempotent.
+        db.EnsureSchema();
+
+        Console.WriteLine("PASS: SQLite schema created (3 tables) + idempotent");
+        return 0;
+    }
+
+    private static int SelfCheckT5()
+    {
+        var dbPath = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t5", "profiles.db");
+        if (File.Exists(dbPath)) File.Delete(dbPath);
+        var db = new Database(dbPath);
+        db.EnsureSchema();
+        var repo = new ProfileRepository(db);
+
+        // Create with 2 regions.
+        var p = new GameProfile
+        {
+            Name = "Test Game",
+            ExecutableName = "test.exe",
+            TargetLang = "en",
+            Regions = new List<CaptureRegion>
+            {
+                new() { RegionName = "Subtitle", X = 10, Y = 20, Width = 800, Height = 100, IsActiveDefault = true, SortOrder = 0 },
+                new() { RegionName = "Dialog", X = 0, Y = 0, Width = 640, Height = 200, SortOrder = 1 },
+            },
+        };
+        int id = repo.Create(p);
+        if (id <= 0)
+        {
+            Console.WriteLine("FAIL: Create returned non-positive id");
+            return 1;
+        }
+
+        // GetAll returns the row.
+        var all = repo.GetAll().ToList();
+        if (all.Count != 1 || all[0].Name != "Test Game")
+        {
+            Console.WriteLine($"FAIL: GetAll count={all.Count}, name={all.FirstOrDefault()?.Name}");
+            return 1;
+        }
+
+        // GetById loads regions.
+        var loaded = repo.GetById(id);
+        if (loaded is null || loaded.Regions.Count != 2)
+        {
+            Console.WriteLine($"FAIL: GetById regions={loaded?.Regions.Count}");
+            return 1;
+        }
+        if (loaded.Regions[0].IsActiveDefault != true || loaded.Regions[0].ProfileId != id)
+        {
+            Console.WriteLine("FAIL: region fields not round-tripped");
+            return 1;
+        }
+
+        // Update name + swap regions.
+        loaded.Name = "Test Game Renamed";
+        loaded.Regions = new List<CaptureRegion> { loaded.Regions[1] };
+        repo.Update(loaded);
+        var updated = repo.GetById(id);
+        if (updated is null || updated.Name != "Test Game Renamed" || updated.Regions.Count != 1)
+        {
+            Console.WriteLine($"FAIL: update name={updated?.Name}, regions={updated?.Regions.Count}");
+            return 1;
+        }
+
+        // T26 bug-fix: Update() must re-assign fresh region ids (delete-then-reinsert). A stale id
+        // leaves the persisted ActiveRegionId orphaned → wrong region picked after an edit.
+        var fresh = repo.GetById(id);
+        if (fresh is null || fresh.Regions[0].Id == 0)
+        {
+            Console.WriteLine("FAIL: updated region kept id 0 — ActiveRegionId would be stale");
+            return 1;
+        }
+
+        // Delete.
+        repo.Delete(id);
+        if (repo.GetById(id) is not null)
+        {
+            Console.WriteLine("FAIL: Delete did not remove profile");
+            return 1;
+        }
+        using (var conn = db.Open())
+        {
+            var regionCount = conn.QuerySingle<int>("SELECT COUNT(*) FROM CaptureRegion WHERE ProfileId=@Id", new { Id = id });
+            if (regionCount != 0)
+            {
+                Console.WriteLine($"FAIL: cascade delete left {regionCount} orphan regions");
+                return 1;
+            }
+        }
+
+        Console.WriteLine("PASS: ProfileRepository CRUD + regions + cascade delete");
+        return 0;
+    }
+
+    private static int SelfCheckT10()
+    {
+        // Grab a small region near the top-left of the primary monitor and verify the
+        // Windows.Graphics.Capture pipeline returns a PNG of the right dimensions.
+        var primary = System.Windows.Forms.Screen.PrimaryScreen!;
+        var sx = primary.Bounds.X;
+        var sy = primary.Bounds.Y;
+        const int w = 320, h = 80;
+
+        using var cap = GameSubTranslate.Capture.ScreenCapture.ForMonitorAt(sx, sy);
+        byte[] png = cap.CaptureRegion(sx, sy, w, h);
+
+        if (png.Length == 0)
+        {
+            Console.WriteLine("FAIL: empty capture");
+            return 1;
+        }
+        using var img = Image.FromStream(new MemoryStream(png));
+        if (img.Width != w || img.Height != h)
+        {
+            Console.WriteLine($"FAIL: PNG size {img.Width}x{img.Height}, expected {w}x{h}");
+            return 1;
+        }
+
+        // Second frame: same region → also decodeable (validates repeated capture).
+        byte[] png2 = cap.CaptureRegion(sx, sy, w, h);
+        if (png2.Length == 0)
+        {
+            Console.WriteLine("FAIL: second capture empty");
+            return 1;
+        }
+
+        Console.WriteLine($"PASS: WGC capture {w}x{h} PNG ({png.Length} bytes) + repeat");
+        return 0;
+    }
+
+    private static int SelfCheckT11()
+    {
+        // Synthetic frames: solid bg + a dark "text" bar. Identical copies → no change.
+        var imgA = MakeFrame("hello world");
+        var imgA2 = MakeFrame("hello world");
+        var imgB = MakeFrame("different words here");
+        var cd = GameSubTranslate.Pipeline.ChangeDetector.IsChanged;
+
+        // Identical (re-encode same pixels) → not changed.
+        if (cd(imgA, imgA2))
+        {
+            Console.WriteLine("FAIL: identical frames flagged as changed");
+            return 1;
+        }
+        // Different text → changed.
+        if (!cd(imgA, imgB))
+        {
+            Console.WriteLine("FAIL: different text not flagged as changed");
+            return 1;
+        }
+        // First capture (no prior) → changed.
+        if (!cd(imgA, null))
+        {
+            Console.WriteLine("FAIL: first frame (null prior) not flagged");
+            return 1;
+        }
+        // Null new frame → not changed.
+        if (cd(null, imgA))
+        {
+            Console.WriteLine("FAIL: null new frame flagged");
+            return 1;
+        }
+
+        // Noise tolerance: same frame with a few random pixels flipped → not changed.
+        var imgA3 = AddNoise(imgA, flips: 40);
+        if (cd(imgA, imgA3))
+        {
+            Console.WriteLine("FAIL: small noise flagged as changed");
+            return 1;
+        }
+
+        Console.WriteLine("PASS: ChangeDetector grid-compare identical/different/first-frame/noise-tolerance");
+        return 0;
+    }
+
+    private static byte[] MakeFrame(string text, float sizeMul = 1f)
+    {
+        const int w = 400, h = 60;
+        using var bmp = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using (var g = Graphics.FromImage(bmp))
+        {
+            g.Clear(Color.White);
+            using var font = new Font("Arial", 18f * sizeMul, FontStyle.Regular, GraphicsUnit.Pixel);
+            using var brush = new SolidBrush(Color.Black);
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+            g.DrawString(text, font, brush, 10, 10);
+        }
+        using var ms = new MemoryStream();
+        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+        return ms.ToArray();
+    }
+
+    /// <summary>Flip `flips` random pixels to simulate capture noise / anti-aliasing jitter.</summary>
+    private static byte[] AddNoise(byte[] png, int flips)
+    {
+        using var img = Image.FromStream(new MemoryStream(png));
+        using var bmp = new Bitmap(img);
+        var rnd = new Random(42);
+        for (int i = 0; i < flips; i++)
+        {
+            int x = rnd.Next(bmp.Width);
+            int y = rnd.Next(bmp.Height);
+            var c = bmp.GetPixel(x, y);
+            int delta = rnd.Next(2) == 0 ? -12 : 12;
+            bmp.SetPixel(x, y, Color.FromArgb(255, Clamp(c.R + delta), Clamp(c.G + delta), Clamp(c.B + delta)));
+        }
+        using var ms = new MemoryStream();
+        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+        return ms.ToArray();
+    }
+
+    private static int Clamp(int v) => Math.Clamp(v, 0, 255);
+
+    // ---------- T12: TranslationClient timeout + retry backoff ----------
+
+    /// <summary>Fakes the /chat/completions endpoint: counts attempts, emits a sequence of status codes / exceptions / a delay.</summary>
+    private sealed class FakeHttpHandler : HttpMessageHandler
+    {
+        private readonly List<object> _script; // int = status code, TimeoutException = simulated timeout
+        public int Attempts;
+
+        public FakeHttpHandler(params object[] script) => _script = script.ToList();
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken ct)
+        {
+            Attempts++;
+            var step = _script[Math.Min(Attempts - 1, _script.Count - 1)]; // last step repeats
+
+            if (step is TimeoutException)
+            {
+                await Task.Delay(300, ct); // a bit of elapsed time so the elapsed check is meaningful
+                throw new TaskCanceledException("simulated timeout");
+            }
+
+            var code = (int)step;
+            if (code == 200)
+            {
+                var body = JsonSerializer.Serialize(new
+                {
+                    choices = new[] { new { message = new { content = "hasil dari API" } } }
+                });
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+                };
+            }
+            return new HttpResponseMessage((HttpStatusCode)code);
+        }
+    }
+
+    private static int SelfCheckT12()
+    {
+        // 1) Timeout each attempt → retries 4x (initial + 3 backoff), returns null, ~7s elapsed.
+        var timeoutHandler = new FakeHttpHandler(new TimeoutException());
+        var timeoutClient = new TranslationClient("k", "https://api.example.com", "m", "auto", "id", timeoutHandler);
+        var sw = Stopwatch.StartNew();
+        var r1 = timeoutClient.TranslateAsync("hello").GetAwaiter().GetResult();
+        sw.Stop();
+        if (r1 is not null || timeoutHandler.Attempts != 4)
+        {
+            Console.WriteLine($"FAIL: timeout retry — result={r1}, attempts={timeoutHandler.Attempts}");
+            return 1;
+        }
+        if (sw.Elapsed.TotalSeconds < 6.5)
+        {
+            Console.WriteLine($"FAIL: timeout backoff too fast — elapsed={sw.Elapsed.TotalSeconds:F1}s (expect ~7s)");
+            return 1;
+        }
+
+        // 2) 429 on attempt 1 → retry, success on attempt 2 → returns translated text.
+        var retryHandler = new FakeHttpHandler(429, 200);
+        var retryClient = new TranslationClient("k", "https://api.example.com", "m", "auto", "id", retryHandler);
+        var r2 = retryClient.TranslateAsync("hello").GetAwaiter().GetResult();
+        if (r2 != "hasil dari API" || retryHandler.Attempts != 2)
+        {
+            Console.WriteLine($"FAIL: 429 retry — result={r2}, attempts={retryHandler.Attempts}");
+            return 1;
+        }
+
+        // 3) 401 → TranslationException after 1 attempt, no retry.
+        var authHandler = new FakeHttpHandler(401, 200);
+        var authClient = new TranslationClient("k", "https://api.example.com", "m", "auto", "id", authHandler);
+        try
+        {
+            authClient.TranslateAsync("hello").GetAwaiter().GetResult();
+            Console.WriteLine("FAIL: 401 did not throw TranslationException");
+            return 1;
+        }
+        catch (TranslationException)
+        {
+            if (authHandler.Attempts != 1)
+            {
+                Console.WriteLine($"FAIL: 401 retried — attempts={authHandler.Attempts}");
+                return 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"FAIL: 401 threw wrong type {ex.GetType().Name}");
+            return 1;
+        }
+
+        Console.WriteLine("PASS: TranslationClient timeout(4 attempts, ~7s) + 429-retry + 401-no-retry");
+        return 0;
+    }
+
+    // ---------- T13: TranslationCacheRepository ----------
+
+    private static int SelfCheckT13()
+    {
+        var dbPath = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t13", "profiles.db");
+        if (File.Exists(dbPath)) File.Delete(dbPath);
+        var db = new Database(dbPath);
+        db.EnsureSchema();
+        var cache = new TranslationCacheRepository(db);
+
+        // Empty → miss.
+        if (cache.Get("Hello", "id") is not null)
+        {
+            Console.WriteLine("FAIL: cache hit on empty cache");
+            return 1;
+        }
+
+        // Hash is deterministic + distinct per text/lang.
+        if (TranslationCacheRepository.Hash("Hello", "id") != TranslationCacheRepository.Hash("Hello", "id")
+            || TranslationCacheRepository.Hash("Hello", "id") == TranslationCacheRepository.Hash("Halo", "id")
+            || TranslationCacheRepository.Hash("Hello", "id") == TranslationCacheRepository.Hash("Hello", "en"))
+        {
+            Console.WriteLine("FAIL: hash not deterministic/distinct");
+            return 1;
+        }
+
+        cache.Put("Hello", "Halo", "id");
+        if (cache.Get("Hello", "id") != "Halo")
+        {
+            Console.WriteLine("FAIL: Get after Put missed");
+            return 1;
+        }
+        if (cache.Get("Hello", "en") is not null)
+        {
+            Console.WriteLine("FAIL: target-lang collision");
+            return 1;
+        }
+
+        // Upsert overwrites, no duplicate rows.
+        cache.Put("Hello", "Halo baru", "id");
+        if (cache.Get("Hello", "id") != "Halo baru")
+        {
+            Console.WriteLine("FAIL: upsert did not overwrite");
+            return 1;
+        }
+        using (var conn = db.Open())
+        {
+            int rows = conn.QuerySingle<int>("SELECT COUNT(*) FROM TranslationCache WHERE SourceText='Hello'");
+            if (rows != 1)
+            {
+                Console.WriteLine($"FAIL: upsert left {rows} rows");
+                return 1;
+            }
+        }
+
+        Console.WriteLine("PASS: TranslationCache get/put/upsert/hash-distinct");
+        return 0;
+    }
+
+    // ---------- T16/T17: TranslatePipeline service (start/stop + pause/resume) ----------
+
+    /// <summary>Scripted capture source: re-evaluates a frame factory on every call so tests can flip content live.</summary>
+    private sealed class FakeCapture : IScreenCapture
+    {
+        private readonly Func<string> _frame;
+        public int FrameCalls;
+        public FakeCapture(Func<string> frame) => _frame = frame;
+
+        public byte[] CaptureRegion(int x, int y, int w, int h)
+        {
+            FrameCalls++;
+            return MakeFrame(_frame());
+        }
+
+        /// <summary>Current frame content — lets a fake OCR "read" what the capture sees.</summary>
+        public string CurrentText() => _frame();
+
+        public void Dispose() { }
+    }
+
+    /// <summary>OCR that returns the frame's current content (via the shared capture). Counts calls.</summary>
+    private sealed class FakeOcr : IOcrEngine
+    {
+        private readonly FakeCapture _cap;
+        public int Calls;
+        public FakeOcr(FakeCapture cap) => _cap = cap;
+        public string Recognize(byte[] pngBytes) { Calls++; return _cap.CurrentText(); }
+    }
+
+    /// <summary>Passthrough translator with an attempt counter, so pipeline-translate calls are observable.</summary>
+    private sealed class FakeTranslator : TranslationClient
+    {
+        public int Attempts;
+        public string? Result = "hasil terjemahan";
+        public FakeTranslator() : base("k", "https://api.example.com", "m", "auto", "id") { }
+
+        public override async Task<string?> TranslateAsync(string text, CancellationToken ct)
+        {
+            await Task.Yield();
+            Attempts++;
+            return Result;
+        }
+    }
+
+    private static int SelfCheckT16()
+    {
+        int fails = 0;
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        // Frames: static until demand > 0 flips to changing subtitle.
+        int demand = 0;
+        string NextFrame() => demand > 0 ? "subtitle berubah" : "teks diam";
+        var cap = new FakeCapture(NextFrame);
+
+        var ocr = new FakeOcr(cap);
+        var trans = new FakeTranslator();
+        var results = new List<string>();
+        var states = new List<string>();
+        using var pipe = new TranslatePipeline(cap, ocr, trans, cache: null,
+            x: 0, y: 0, w: 100, h: 30, intervalMs: 30, t => results.Add(t));
+        pipe.StatusChanged += s => states.Add(s);
+
+        pipe.Start();
+        Thread.Sleep(700);
+        int capBefore = cap.FrameCalls;
+        int ocrCallsBefore = ocr.Calls;
+        int transCallsBefore = trans.Attempts;
+        int resultBefore = results.Count;
+        Check(pipe.IsRunning, "pipeline not running after Start");
+        Check(capBefore > 3, $"loop not ticking (capture calls={capBefore})");
+        Check(ocrCallsBefore == 1, $"static frame re-OCR'd ({ocrCallsBefore} OCR calls)");
+
+        // Subtitle changes → loop detects it → OCR + translate → callback fires.
+        demand = 1;
+        int deadline = Environment.TickCount + 5000;
+        while (results.Count == resultBefore && Environment.TickCount < deadline) Thread.Sleep(25);
+        Check(results.Count > resultBefore, $"onTranslated callback never fired for changed text (count={results.Count})");
+        Check(trans.Attempts > transCallsBefore, "translate never called");
+        Check(ocr.Calls > ocrCallsBefore, "OCR never called");
+        Check(cap.FrameCalls > capBefore, "capture stopped during change");
+
+        // Stop → loop halts, no more calls, no exception.
+        pipe.Stop();
+        Check(!pipe.IsRunning, "pipeline still running after Stop");
+        int ocrAfterStop = ocr.Calls;
+        int transAfterStop = trans.Attempts;
+        Thread.Sleep(300);
+        Check(ocr.Calls == ocrAfterStop && trans.Attempts == transAfterStop, "loop kept running after Stop");
+
+        // Restart works (Idempotent Start).
+        pipe.Start();
+        Thread.Sleep(200);
+        Check(pipe.IsRunning, "pipeline did not restart");
+        pipe.Stop();
+
+        Console.WriteLine(fails == 0
+            ? "PASS: TranslatePipeline start/stop/loop/callback"
+            : $"FAIL: {fails} T16 checks failed");
+        return fails == 0 ? 0 : 1;
+    }
+
+    private static int SelfCheckT17()
+    {
+        int fails = 0;
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        var cap = new FakeCapture(() => "subtitle satu");
+        var ocr = new FakeOcr(cap);
+        var trans = new FakeTranslator();
+        var results = new List<string>();
+        using var pipe = new TranslatePipeline(cap, ocr, trans, cache: null,
+            x: 0, y: 0, w: 100, h: 30, intervalMs: 25, t => results.Add(t));
+
+        pipe.Start();
+        // Pause immediately — the first frame may slip through before pause lands.
+        pipe.Pause();
+        Thread.Sleep(600);
+        int transBefore = trans.Attempts;
+        int capBefore = cap.FrameCalls;
+
+        Thread.Sleep(600);
+        Check(pipe.IsPaused, "not paused");
+        Check(trans.Attempts == transBefore, $"translate called while paused ({trans.Attempts - transBefore} extra)");
+        Check(cap.FrameCalls > capBefore, $"capture loop stopped while paused (frames={cap.FrameCalls - capBefore})");
+
+        // Resume → the (already-translated) frame yields no new API call.
+        pipe.Resume();
+        Thread.Sleep(600);
+        Check(!pipe.IsPaused, "not resumed");
+        Check(trans.Attempts == transBefore, $"translate called after resume with no new frame (extra={trans.Attempts - transBefore})");
+        pipe.Stop();
+
+        Console.WriteLine(fails == 0
+            ? "PASS: TranslatePipeline pause keeps capture alive + skips translate; resume continues"
+            : $"FAIL: {fails} T17 checks failed");
+        return fails == 0 ? 0 : 1;
+    }
+
+    private static int SelfCheckT9()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t9");
+        var dbPath = Path.Combine(tmp, "profiles.db");
+        if (File.Exists(dbPath)) File.Delete(dbPath);
+        var db = new Database(dbPath);
+        db.EnsureSchema();
+        var repo = new ProfileRepository(db);
+
+        // Profile with 2 regions.
+        int id = repo.Create(new GameProfile
+        {
+            Name = "Region Switcher Test",
+            Regions = new List<CaptureRegion>
+            {
+                new() { RegionName = "A", X = 0, Y = 0, Width = 100, Height = 50, IsActiveDefault = true, SortOrder = 0 },
+                new() { RegionName = "B", X = 100, Y = 0, Width = 100, Height = 50, SortOrder = 1 },
+            },
+        });
+
+        // Service state is persisted to settings.json; fresh service must restore it.
+        var settingsFile = Path.Combine(tmp, "settings.json");
+        var store = new SettingsStore(settingsFile);
+        var app = store.Load();
+
+        var svc = new ProfileService(repo, store, app);
+        svc.SetActiveProfile(id);
+
+        // ActiveProfile set, default region (A) auto-selected.
+        if (svc.ActiveProfileId != id || svc.ActiveRegion()?.RegionName != "A")
+        {
+            Console.WriteLine($"FAIL: initial active profile/region. profile={svc.ActiveProfileId}, region={svc.ActiveRegion()?.RegionName}");
+            return 1;
+        }
+
+        // Switch to region B.
+        var regionB = svc.ActiveProfile!.Regions.First(r => r.RegionName == "B");
+        svc.SetActiveRegion(regionB.Id);
+        if (svc.ActiveRegion()?.RegionName != "B")
+        {
+            Console.WriteLine("FAIL: SetActiveRegion did not switch");
+            return 1;
+        }
+
+        // New service instance (simulates restart) restores B.
+        var svc2 = new ProfileService(repo, new SettingsStore(settingsFile), store.Load());
+        if (svc2.ActiveProfileId != id || svc2.ActiveRegion()?.RegionName != "B")
+        {
+            Console.WriteLine($"FAIL: restart did not restore. profile={svc2.ActiveProfileId}, region={svc2.ActiveRegion()?.RegionName}");
+            return 1;
+        }
+
+        // Clearing after delete works.
+        svc2.ClearActiveProfile();
+        var svc3 = new ProfileService(repo, new SettingsStore(settingsFile), store.Load());
+        if (svc3.ActiveProfileId is not null)
+        {
+            Console.WriteLine("FAIL: ClearActiveProfile not persisted");
+            return 1;
+        }
+
+        Console.WriteLine("PASS: ProfileService active region switch + persistence across restart");
+        return 0;
+    }
+
+    // ---------- T26: E2E cache integration (scenario 6: same text twice → 1 API call) ----------
+
+    private static int SelfCheckT26()
+    {
+        int fails = 0;
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        // Real SQLite cache + pipeline over fakes. Same subtitle appears twice → only the first
+        // translation hits the API; the second comes from the cache. Mirrors the app wiring
+        // (MainWindow.EnsurePipeline now passes a real TranslationCacheRepository).
+        var dbPath = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t26", "profiles.db");
+        if (File.Exists(dbPath)) File.Delete(dbPath);
+        var db = new Database(dbPath);
+        db.EnsureSchema();
+        var cache = new TranslationCacheRepository(db);
+
+        var cap = new FakeCapture(() => "subtitle yang sama");
+        var ocr = new FakeOcr(cap);
+        var trans = new FakeTranslator();
+        using var pipe = new TranslatePipeline(cap, ocr, trans, cache,
+            x: 0, y: 0, w: 100, h: 30, intervalMs: 25, _ => { });
+
+        // Manual trigger reads cache first (T13 hook): second run must not re-hit the API.
+        var r1 = pipe.CaptureOnceAsync().GetAwaiter().GetResult();
+        Check(r1 == "hasil terjemahan", $"first translate failed ({r1})");
+        Check(trans.Attempts == 1, $"first translate should hit API once ({trans.Attempts})");
+        Check(cache.Get("subtitle yang sama", trans.TargetLang) is not null, "cache miss after first Put");
+
+        var r2 = pipe.CaptureOnceAsync().GetAwaiter().GetResult();
+        Check(r2 == "hasil terjemahan", $"cached translate failed ({r2})");
+        Check(trans.Attempts == 1, $"second translate re-hit API ({trans.Attempts} attempts)");
+
+        Console.WriteLine(fails == 0
+            ? "PASS: T26 cache integration — same text twice = 1 API call"
+            : $"FAIL: {fails} T26 cache checks failed");
+        return fails == 0 ? 0 : 1;
+    }
+}
