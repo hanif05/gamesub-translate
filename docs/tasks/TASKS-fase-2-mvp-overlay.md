@@ -198,6 +198,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: file `src/App/Overlay/OverlayWindow.xaml(.cs)`, helper `Win32.cs` dengan `SetWindowLong` P/Invoke.
 **Done when**: app launch → overlay window muncul transparan (hanya background kosong kelihatan) di atas desktop, mouse click tembus ke window di belakangnya (test dengan Notepad di belakang overlay).
 **Depends on**: T2.
+**Status**: ✅ DONE (verified --selfcheck-t14)
 
 #### T15. Overlay text rendering + style settings
 **Deskripsi**: Di `OverlayWindow`, tambah `TextBlock` (atau `ContentControl` dengan `ScrollViewer` untuk teks panjang) yang bind ke `OverlayViewModel.Text`. Style:
@@ -209,6 +210,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: `src/App/Overlay/OverlayViewModel.cs`, update `OverlayWindow.xaml`.
 **Done when**: panggil `overlay.ShowText("Hello translated world")` dari test code → teks muncul styled sesuai settings. Ganti setting → restart app → style baru aktif.
 **Depends on**: T14, T3.
+**Status**: ✅ DONE (verified --selfcheck-t15)
 
 ---
 
