@@ -1,8 +1,10 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using GameSubTranslate.App.Overlay;
 using GameSubTranslate.Config;
+using GameSubTranslate.Hotkeys;
 
 namespace GameSubTranslate.App;
 
@@ -16,6 +18,8 @@ internal static class SelfChecks
     {
         "--selfcheck-t14" => SelfCheckT14(),
         "--selfcheck-t15" => SelfCheckT15(),
+        "--selfcheck-t18" => SelfCheckT18(),
+        "--selfcheck-t19" => SelfCheckT19(),
         _ => SelfCheckT14(),
     };
 
@@ -97,6 +101,75 @@ internal static class SelfChecks
         Console.WriteLine(fails == 0
             ? "PASS: OverlayWindow text rendering + settings-driven style"
             : $"FAIL: {fails} text/style checks failed");
+        return fails == 0 ? 0 : 1;
+    }
+
+    private static int SelfCheckT18()
+    {
+        int fails = 0;
+
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        // TryParse: parse "Ctrl+Alt+T" spec back into modifiers + key.
+        Check(GlobalHotkeyManager.TryParse("Ctrl+Alt+T", out var mods, out var key),
+            "TryParse 'Ctrl+Alt+T' failed");
+        Check((mods & ModifierKeys.Control) != 0 && (mods & ModifierKeys.Alt) != 0,
+            "Ctrl+Alt modifiers not parsed");
+        Check(key == Key.T, "key T not parsed");
+        Check(!GlobalHotkeyManager.TryParse("garbage", out _, out _), "TryParse garbage should fail");
+
+        // Register → fire → callback runs. Unregister → fire → callback must NOT run.
+        using var mgr = new GlobalHotkeyManager();
+        int calls = 0;
+        Check(mgr.Register("Test", ModifierKeys.Control | ModifierKeys.Alt, Key.T, () => calls++),
+            "Register failed");
+        Check(!mgr.Register("Test", ModifierKeys.None, Key.X, () => { }),
+            "duplicate id should fail");
+        mgr.FireForTest("Test");
+        Check(calls == 1, "callback not fired after register");
+        Check(mgr.Unregister("Test"), "Unregister failed");
+        mgr.FireForTest("Test");
+        Check(calls == 1, "callback fired after unregister");
+
+        Console.WriteLine(fails == 0
+            ? "PASS: GlobalHotkeyManager register/fire/unregister"
+            : $"FAIL: {fails} hotkey checks failed");
+        return fails == 0 ? 0 : 1;
+    }
+
+    private static int SelfCheckT19()
+    {
+        int fails = 0;
+
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        var overlay = new OverlayWindow(new AppSettings());
+        overlay.ShowText("teks bertahan");
+        overlay.ShowOverlay();
+        Check(overlay.IsVisible, "overlay not visible after ShowOverlay");
+
+        overlay.HideOverlay();
+        Check(!overlay.IsVisible, "overlay still visible after HideOverlay");
+
+        // Text state survives hide → shown again.
+        overlay.ShowOverlay();
+        Check(overlay.IsVisible, "overlay not visible on second Show");
+        Check(overlay.ViewModel.Text == "teks bertahan", "text state reset across hide/show");
+
+        overlay.Close();
+        Console.WriteLine(fails == 0
+            ? "PASS: overlay show/hide toggle keeps text state"
+            : $"FAIL: {fails} toggle checks failed");
         return fails == 0 ? 0 : 1;
     }
 }

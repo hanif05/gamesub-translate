@@ -244,12 +244,14 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: file `src/Core/Hotkeys/GlobalHotkeyManager.cs`, `Win32.cs` (extend).
 **Done when**: register `Ctrl+Alt+T` → callback dipanggil saat tekan hotkey, meskipun MainWindow tidak focused. Unregister saat dispose → callback tidak dipanggil lagi.
 **Depends on**: T2.
+**Status**: ✅ DONE (verified --selfcheck-t18)
 
 #### T19. Hotkey: toggle overlay show/hide
 **Deskripsi**: Bind hotkey `AppSettings.HotkeyToggleOverlay` (default `Ctrl+Alt+T`) → `overlay.Show() / overlay.Hide()`. State overlay disimpan di memory, hide = `Visibility.Hidden` (bukan close, supaya state teks tetap).
 **Output**: wiring di `App.OnStartup`.
 **Done when**: tekan `Ctrl+Alt+T` saat main game window aktif → overlay muncul/hilang. State teks tidak reset.
 **Depends on**: T14, T15, T18.
+**Status**: ✅ DONE (verified --selfcheck-t19)
 
 #### T20. Hotkey: pause/resume capture
 **Deskripsi**: Bind `AppSettings.HotkeyPauseCapture` (default `Ctrl+Alt+P`) → `pipeline.Pause() / pipeline.Resume()`. Visual indicator kecil (icon di tray, lihat T24) update.
