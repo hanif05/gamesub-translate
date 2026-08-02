@@ -97,6 +97,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 - Validation minimal: `Name` non-empty, `ExecutableName` optional.
 **Output**: file `src/Core/Profiles/GameProfile.cs`, `CaptureRegion.cs`, `ProfileRepository.cs`.
 **Done when**: dari quick test di `Program.cs` console, bisa create profile + 2 region, GetAll return list benar, update nama, delete. DB row count sesuai.
+**Status**: ✅ DONE (commit f672889, verified --selfcheck-t5)
 **Depends on**: T4.
 
 #### T6. MainWindow: profile list + create/edit/delete
