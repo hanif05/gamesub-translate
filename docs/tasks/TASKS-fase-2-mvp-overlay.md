@@ -142,7 +142,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: rewrite `src/Core/Capture/ScreenCapture.cs`.
 **Done when**: panggil `CaptureRegion(x, y, w, h)` dari test program, hasilnya PNG dengan dimensi sesuai region dan konten yang benar (compare dengan screenshot manual).
 **Depends on**: T1.
-**Status**: ✅ DONE (verified --selfcheck-t10 + CLI OCR)
+**Status**: ✅ DONE (commit d6fde49, verified --selfcheck-t10 + CLI OCR)
 
 #### T11. Change detection: perceptual hash
 **Deskripsi**: Upgrade `ChangeDetector.cs`. Fase 1 pakai byte-compare (kurang robust). Fase 2: perceptual hash (pHash) 64-bit.
@@ -152,6 +152,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: update `src/Core/Pipeline/ChangeDetector.cs`.
 **Done when**: test synthetic pass: 100 identik calls semua return false; 100 calls dengan teks berganti 1 kata di tengah return true.
 **Depends on**: T10.
+**Status**: ✅ DONE (commit d6fde49, verified --selfcheck-t11)
 
 ---
 
