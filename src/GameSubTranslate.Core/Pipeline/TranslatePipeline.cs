@@ -27,6 +27,10 @@ public sealed class TranslatePipeline : IDisposable
     private readonly int _x, _y, _w, _h, _intervalMs;
 
     private readonly object _sync = new();
+    // Serializes access to the WGC capture source: the capture instance is not thread-safe
+    // (frame pool + AutoResetEvent), so the loop's ticking and a manual CaptureOnce (T22)
+    // must never call CaptureRegion concurrently.
+    private readonly SemaphoreSlim _captureLock = new(1, 1);
     private CancellationTokenSource? _cts;
     private Task? _loop;
     private volatile bool _paused;
@@ -113,9 +117,42 @@ public sealed class TranslatePipeline : IDisposable
         StatusChanged?.Invoke("resumed");
     }
 
+    /// <summary>
+    /// T22: run a single capture → OCR → translate → callback cycle, skipping change detection.
+    /// Works whether or not the loop is running or paused. Returns the translated text (or null on
+    /// empty frame / translation failure). Uses the same region + session as the loop.
+    /// </summary>
+    public async Task<string?> CaptureOnceAsync(CancellationToken ct = default)
+    {
+        byte[] png = await CaptureLockedAsync(ct);
+        if (png.Length == 0) return null;
+        _lastPng = png;
+        string text = _ocr.Recognize(png);
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        _lastText = text;
+        string? translated = await TranslateAsync(text, ct);
+        if (translated is not null) _onTranslated(translated);
+        return translated;
+    }
+
+    /// <summary>Capture one frame under the capture lock, so a manual trigger never races the loop.</summary>
+    private async Task<byte[]> CaptureLockedAsync(CancellationToken ct)
+    {
+        await _captureLock.WaitAsync(ct);
+        try
+        {
+            return _capture.CaptureRegion(_x, _y, _w, _h);
+        }
+        finally
+        {
+            _captureLock.Release();
+        }
+    }
+
     public void Dispose()
     {
         Stop();
+        _captureLock.Dispose();
         _capture.Dispose();
     }
 
@@ -129,12 +166,12 @@ public sealed class TranslatePipeline : IDisposable
                 {
                     // Keep the newest frame available so resume compares against the latest
                     // subtitle state — no backlog, no burst of API calls.
-                    byte[] pausedFrame = _capture.CaptureRegion(_x, _y, _w, _h);
+                    byte[] pausedFrame = await CaptureLockedAsync(ct);
                     if (pausedFrame.Length > 0) _lastPng = pausedFrame;
                 }
                 else
                 {
-                    byte[] png = _capture.CaptureRegion(_x, _y, _w, _h);
+                    byte[] png = await CaptureLockedAsync(ct);
                     if (png.Length > 0 && ChangeDetector.IsChanged(png, _lastPng))
                     {
                         _lastPng = png;

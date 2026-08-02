@@ -16,12 +16,13 @@ public partial class MainWindow : Window
     private readonly Database _db;
     private readonly SettingsStore _settingsStore;
     private readonly AppSettings _settings;
+    private readonly Overlay.OverlayWindow? _overlay;
     private TranslatePipeline? _pipeline;
     private bool _updating; // guard against event feedback during Refresh
 
-    public MainWindow() : this(new Database(), null) { }
+    public MainWindow() : this(new Database(), null, null) { }
 
-    public MainWindow(Database db, Window? owner)
+    public MainWindow(Database db, Window? owner, Overlay.OverlayWindow? overlay = null)
     {
         InitializeComponent();
         _db = db;
@@ -30,6 +31,7 @@ public partial class MainWindow : Window
         _settingsStore = new SettingsStore();
         _settings = _settingsStore.Load();
         _service = new ProfileService(_repo, _settingsStore, _settings);
+        _overlay = overlay;
         if (owner is not null) Owner = owner;
         Refresh();
     }
@@ -152,11 +154,36 @@ public partial class MainWindow : Window
 
     // ---- T16 pipeline controls ----
 
+    /// <summary>Show + focus from a hotkey (T21 settings shortcut targets the main window until T23).</summary>
+    public void ShowAndFocus()
+    {
+        Show();
+        Activate();
+    }
+
+    /// <summary>T20: hotkey toggles pipeline pause/resume. Builds the pipeline if not yet started.</summary>
+    public void TogglePause()
+    {
+        var pipe = EnsurePipeline();
+        if (pipe is null) return;
+        if (pipe.IsPaused) pipe.Resume();
+        else pipe.Pause();
+        SetButtons(running: pipe.IsRunning, paused: pipe.IsPaused);
+    }
+
+    /// <summary>T22: hotkey triggers one capture → OCR → translate cycle, bypassing change detection.</summary>
+    public async void TriggerManualCapture()
+    {
+        var pipe = EnsurePipeline();
+        if (pipe is null) return;
+        await pipe.CaptureOnceAsync();
+    }
+
     /// <summary>
     /// Lazy-builds the pipeline over the active region. No region / no config → status shows why
     /// instead of starting a broken loop. T17 pause/resume added in T20's hotkey wiring.
     /// </summary>
-    private TranslatePipeline? EnsurePipeline()
+    public TranslatePipeline? EnsurePipeline()
     {
         if (_pipeline is not null) return _pipeline;
         var region = _service.ActiveRegion();
@@ -175,7 +202,11 @@ public partial class MainWindow : Window
         var ocr = new TesseractOcrEngine();
         _pipeline = TranslatePipeline.ForEnvironment(
             region.X, region.Y, region.Width, region.Height, _settings.CaptureIntervalMs,
-            ocr, cfg, cache: null, t => Dispatcher.Invoke(() => SetStatus($"dst: {t}")));
+            ocr, cfg, cache: null, t => Dispatcher.Invoke(() =>
+            {
+                SetStatus($"dst: {t}");
+                _overlay?.ShowText(t); // T22: translated text lands on the overlay.
+            }));
         return _pipeline;
     }
 
@@ -218,4 +249,7 @@ public partial class MainWindow : Window
         base.OnClosed(e);
         _pipeline?.Dispose();
     }
+
+    /// <summary>Disposes the pipeline when the app exits without closing the window first.</summary>
+    public void Dispose() => _pipeline?.Dispose();
 }

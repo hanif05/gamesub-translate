@@ -1,10 +1,15 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using GameSubTranslate.App.Overlay;
+using GameSubTranslate.Capture;
 using GameSubTranslate.Config;
 using GameSubTranslate.Hotkeys;
+using GameSubTranslate.Ocr;
+using GameSubTranslate.Pipeline;
+using GameSubTranslate.Translation;
 
 namespace GameSubTranslate.App;
 
@@ -20,6 +25,7 @@ internal static class SelfChecks
         "--selfcheck-t15" => SelfCheckT15(),
         "--selfcheck-t18" => SelfCheckT18(),
         "--selfcheck-t19" => SelfCheckT19(),
+        "--selfcheck-t22" => SelfCheckT22(),
         _ => SelfCheckT14(),
     };
 
@@ -171,5 +177,93 @@ internal static class SelfChecks
             ? "PASS: overlay show/hide toggle keeps text state"
             : $"FAIL: {fails} toggle checks failed");
         return fails == 0 ? 0 : 1;
+    }
+
+    private static int SelfCheckT22()
+    {
+        int fails = 0;
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        var cap = new FakeCapture(() => "subtitle manual");
+        var ocr = new FakeOcr(cap);
+        var trans = new FakeTranslator();
+        var results = new List<string>();
+        using var pipe = new TranslatePipeline(cap, ocr, trans, cache: null,
+            x: 0, y: 0, w: 100, h: 30, intervalMs: 25, t => results.Add(t));
+
+        // CaptureOnce bypasses the loop (never started) and change detection.
+        var result = pipe.CaptureOnceAsync().GetAwaiter().GetResult();
+        Check(result == "hasil terjemahan", $"CaptureOnce returned {result}");
+        Check(trans.Attempts == 1, $"translate not called exactly once ({trans.Attempts})");
+        Check(results.Count == 1 && results[0] == "hasil terjemahan", "onTranslated not fired for manual capture");
+        Check(!pipe.IsRunning, "CaptureOnce must not start the loop");
+
+        // Empty frame → null, no translate call.
+        var empty = new FakeCapture(() => "");
+        var ocrEmpty = new FakeOcr(empty);
+        var transEmpty = new FakeTranslator();
+        using var pipe2 = new TranslatePipeline(empty, ocrEmpty, transEmpty, cache: null,
+            x: 0, y: 0, w: 100, h: 30, intervalMs: 25, _ => { });
+        var r2 = pipe2.CaptureOnceAsync().GetAwaiter().GetResult();
+        Check(r2 is null && transEmpty.Attempts == 0, $"empty frame should not translate (result={r2}, attempts={transEmpty.Attempts})");
+
+        Console.WriteLine(fails == 0
+            ? "PASS: pipeline CaptureOnce bypasses loop + fires callback once"
+            : $"FAIL: {fails} CaptureOnce checks failed");
+        return fails == 0 ? 0 : 1;
+    }
+
+    // ---------- Fakes for pipeline checks (mirrors GameSubTranslate.Prototype.SelfChecks) ----------
+
+    private sealed class FakeCapture : IScreenCapture
+    {
+        private readonly Func<string> _frame;
+        public FakeCapture(Func<string> frame) => _frame = frame;
+        public byte[] CaptureRegion(int x, int y, int w, int h) => MakeFrame(_frame());
+        public string CurrentText() => _frame();
+        public void Dispose() { }
+    }
+
+    private sealed class FakeOcr : IOcrEngine
+    {
+        private readonly FakeCapture _cap;
+        public FakeOcr(FakeCapture cap) => _cap = cap;
+        public string Recognize(byte[] pngBytes) => _cap.CurrentText();
+    }
+
+    private sealed class FakeTranslator : TranslationClient
+    {
+        public int Attempts;
+        public string? Result = "hasil terjemahan";
+        public FakeTranslator() : base("k", "https://api.example.com", "m", "auto", "id") { }
+        // Completed task, no yield: the self-check runs on the WPF UI thread, and awaiting a
+        // Task.Yield() would hop back to the (blocked) dispatcher → deadlock.
+        public override Task<string?> TranslateAsync(string text, CancellationToken ct)
+        {
+            Attempts++;
+            return Task.FromResult(Result);
+        }
+    }
+
+    private static byte[] MakeFrame(string text)
+    {
+        const int w = 400, h = 60;
+        using var bmp = new System.Drawing.Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using (var g = System.Drawing.Graphics.FromImage(bmp))
+        {
+            g.Clear(System.Drawing.Color.White);
+            using var font = new System.Drawing.Font("Arial", 18f, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Pixel);
+            using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Black);
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+            g.DrawString(text, font, brush, 10, 10);
+        }
+        using var ms = new MemoryStream();
+        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+        return ms.ToArray();
     }
 }

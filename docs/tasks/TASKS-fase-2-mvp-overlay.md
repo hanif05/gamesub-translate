@@ -258,18 +258,21 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: wiring di `App.OnStartup`.
 **Done when**: tekan `Ctrl+Alt+P` → pipeline pause (tidak ada log OCR/translate baru). Tekan lagi → resume.
 **Depends on**: T17, T18.
+**Status**: ✅ DONE (wiring App.OnStartup → MainWindow.TogglePause; hotkey mgr verified T18, pause/resume verified T17)
 
 #### T21. Hotkey: open settings panel
 **Deskripsi**: Bind `AppSettings.HotkeyOpenSettings` (default `Ctrl+Alt+S`) → show `SettingsWindow` (lihat T23) atau focus ke MainWindow.
 **Output**: wiring di `App.OnStartup`.
 **Done when**: tekan `Ctrl+Alt+S` saat game aktif → settings window muncul di foreground. ESC atau close → hilang.
 **Depends on**: T18, T23 (minimal placeholder settings window).
+**Status**: ✅ DONE (sementara fokus ke MainWindow via ShowAndFocus — SettingsWindow placeholder sampai T23)
 
 #### T22. Hotkey: manual screenshot trigger
 **Deskripsi**: Bind `AppSettings.HotkeyManualCapture` (default `Ctrl+Alt+Space`) → trigger 1x capture pipeline (capture → ocr → translate → tampil di overlay) tanpa change detection. Method `Pipeline.CaptureOnce()` return `Task<string?>`.
 **Output**: update `TranslatePipeline.cs`, wiring di `App.OnStartup`.
 **Done when**: dengan pipeline paused atau capture area kosong, tekan `Ctrl+Alt+Space` → 1 translate result muncul di overlay. Tidak loop otomatis.
 **Depends on**: T16, T18.
+**Status**: ✅ DONE (pipeline.CaptureOnceAsync + `_captureLock` semaphore; hasil tampil di overlay; verified --selfcheck-t22)
 
 ---
 

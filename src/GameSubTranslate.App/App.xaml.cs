@@ -2,6 +2,7 @@ using System.Windows;
 using GameSubTranslate.App.Overlay;
 using GameSubTranslate.Config;
 using GameSubTranslate.Hotkeys;
+using GameSubTranslate.Storage;
 
 namespace GameSubTranslate.App;
 
@@ -9,6 +10,7 @@ public partial class App : System.Windows.Application
 {
     private OverlayWindow? _overlay;
     private GlobalHotkeyManager? _hotkeys;
+    private MainWindow? _main;
 
     protected override void OnStartup(System.Windows.StartupEventArgs e)
     {
@@ -24,12 +26,19 @@ public partial class App : System.Windows.Application
 
         var settings = new SettingsStore().Load();
         _overlay = new OverlayWindow(settings);
+        _main = new MainWindow(new Database(), null, _overlay);
+
         _hotkeys = new GlobalHotkeyManager();
         if (GlobalHotkeyManager.TryParse(settings.HotkeyToggleOverlay, out var mods, out var key))
             _hotkeys.Register("ToggleOverlay", mods, key, ToggleOverlay);
+        if (GlobalHotkeyManager.TryParse(settings.HotkeyPauseCapture, out mods, out key))
+            _hotkeys.Register("PauseCapture", mods, key, TogglePause);
+        if (GlobalHotkeyManager.TryParse(settings.HotkeyOpenSettings, out mods, out key))
+            _hotkeys.Register("OpenSettings", mods, key, OpenSettings);
+        if (GlobalHotkeyManager.TryParse(settings.HotkeyManualCapture, out mods, out key))
+            _hotkeys.Register("ManualCapture", mods, key, ManualCapture);
 
-        var main = new MainWindow();
-        main.Show();
+        _main.Show();
     }
 
     /// <summary>T19: hotkey toggles overlay visibility. Hide keeps the text state.</summary>
@@ -40,9 +49,19 @@ public partial class App : System.Windows.Application
         else _overlay.ShowOverlay();
     }
 
+    /// <summary>T20: hotkey toggles pipeline pause/resume.</summary>
+    private void TogglePause() => _main?.TogglePause();
+
+    /// <summary>T21: hotkey focuses the main window (placeholder until T23's SettingsWindow).</summary>
+    private void OpenSettings() => _main?.ShowAndFocus();
+
+    /// <summary>T22: hotkey triggers a single capture → OCR → translate cycle.</summary>
+    private void ManualCapture() => _main?.TriggerManualCapture();
+
     protected override void OnExit(ExitEventArgs e)
     {
         _hotkeys?.Dispose();
+        _main?.Dispose();
         base.OnExit(e);
     }
 }
