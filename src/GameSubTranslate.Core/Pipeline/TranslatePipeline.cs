@@ -1,3 +1,4 @@
+using GameSubTranslate.Cache;
 using GameSubTranslate.Capture;
 using GameSubTranslate.Config;
 using GameSubTranslate.Ocr;
@@ -14,12 +15,15 @@ public sealed class TranslatePipeline
     private readonly int _x, _y, _w, _h, _intervalMs;
     private readonly IOcrEngine _ocr;
     private readonly TranslationClient? _translator;
+    private readonly TranslationCacheRepository? _cache;
     private readonly bool _translationEnabled;
 
-    public TranslatePipeline(int x, int y, int w, int h, int intervalMs, IOcrEngine ocr, AppConfig cfg)
+    public TranslatePipeline(int x, int y, int w, int h, int intervalMs, IOcrEngine ocr, AppConfig cfg,
+        TranslationCacheRepository? cache = null)
     {
         _x = x; _y = y; _w = w; _h = h; _intervalMs = intervalMs;
         _ocr = ocr;
+        _cache = cache;
         _translationEnabled = cfg.TranslationEnabled;
         _translator = _translationEnabled
             ? new TranslationClient(cfg.ApiKey!, cfg.BaseUrl!, cfg.Model!, cfg.SourceLang, cfg.TargetLang)
@@ -56,7 +60,12 @@ public sealed class TranslatePipeline
                 string? translated = null;
                 if (_translator is not null)
                 {
-                    try { translated = await _translator.TranslateAsync(text, ct); }
+                    try
+                    {
+                        translated = _cache?.Get(text, _translator.TargetLang) ?? await _translator.TranslateAsync(text, ct);
+                        if (translated is not null && _cache is not null)
+                            _cache.Put(text, translated, _translator.TargetLang);
+                    }
                     catch (Exception ex) { Console.Error.WriteLine($"[translate-error] {ex.GetType().Name}: {ex.Message}"); }
                 }
 

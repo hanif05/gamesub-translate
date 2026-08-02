@@ -171,6 +171,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 - Mock simulate 429 di attempt 1, success di attempt 2 → return translated text.
 - Mock simulate 401 → throw `TranslationException` setelah 1 attempt, no retry.
 **Depends on**: T1.
+**Status**: ✅ DONE (verified --selfcheck-t12)
 
 #### T13. Translation cache
 **Deskripsi**: Di Core, namespace `GameSubTranslate.Cache`. `TranslationCacheRepository`:
@@ -181,6 +182,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: file `src/Core/Cache/TranslationCacheRepository.cs`, integrasi di `TranslatePipeline`.
 **Done when**: translate "Hello" 2x → API call hanya 1x, kedua call dapat hasil yang sama dari cache. Verify dengan log HTTP request.
 **Depends on**: T4, T12.
+**Status**: ✅ DONE (verified --selfcheck-t13)
 
 ---
 

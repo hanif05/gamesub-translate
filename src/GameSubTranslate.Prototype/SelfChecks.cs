@@ -1,8 +1,14 @@
 using Dapper;
+using System.Diagnostics;
 using System.Drawing;
+using System.Net;
+using System.Net.Http;
+using System.Text.Json;
+using GameSubTranslate.Cache;
 using GameSubTranslate.Config;
 using GameSubTranslate.Profiles;
 using GameSubTranslate.Storage;
+using GameSubTranslate.Translation;
 
 namespace GameSubTranslate.Prototype;
 
@@ -20,6 +26,8 @@ internal static class SelfChecks
         "--selfcheck-t9" => SelfCheckT9(),
         "--selfcheck-t10" => SelfCheckT10(),
         "--selfcheck-t11" => SelfCheckT11(),
+        "--selfcheck-t12" => SelfCheckT12(),
+        "--selfcheck-t13" => SelfCheckT13(),
         _ => SelfCheckT3(),
     };
 
@@ -307,6 +315,158 @@ internal static class SelfChecks
     }
 
     private static int Clamp(int v) => Math.Clamp(v, 0, 255);
+
+    // ---------- T12: TranslationClient timeout + retry backoff ----------
+
+    /// <summary>Fakes the /chat/completions endpoint: counts attempts, emits a sequence of status codes / exceptions / a delay.</summary>
+    private sealed class FakeHttpHandler : HttpMessageHandler
+    {
+        private readonly List<object> _script; // int = status code, TimeoutException = simulated timeout
+        public int Attempts;
+
+        public FakeHttpHandler(params object[] script) => _script = script.ToList();
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken ct)
+        {
+            Attempts++;
+            var step = _script[Math.Min(Attempts - 1, _script.Count - 1)]; // last step repeats
+
+            if (step is TimeoutException)
+            {
+                await Task.Delay(300, ct); // a bit of elapsed time so the elapsed check is meaningful
+                throw new TaskCanceledException("simulated timeout");
+            }
+
+            var code = (int)step;
+            if (code == 200)
+            {
+                var body = JsonSerializer.Serialize(new
+                {
+                    choices = new[] { new { message = new { content = "hasil dari API" } } }
+                });
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+                };
+            }
+            return new HttpResponseMessage((HttpStatusCode)code);
+        }
+    }
+
+    private static int SelfCheckT12()
+    {
+        // 1) Timeout each attempt → retries 4x (initial + 3 backoff), returns null, ~7s elapsed.
+        var timeoutHandler = new FakeHttpHandler(new TimeoutException());
+        var timeoutClient = new TranslationClient("k", "https://api.example.com", "m", "auto", "id", timeoutHandler);
+        var sw = Stopwatch.StartNew();
+        var r1 = timeoutClient.TranslateAsync("hello").GetAwaiter().GetResult();
+        sw.Stop();
+        if (r1 is not null || timeoutHandler.Attempts != 4)
+        {
+            Console.WriteLine($"FAIL: timeout retry — result={r1}, attempts={timeoutHandler.Attempts}");
+            return 1;
+        }
+        if (sw.Elapsed.TotalSeconds < 6.5)
+        {
+            Console.WriteLine($"FAIL: timeout backoff too fast — elapsed={sw.Elapsed.TotalSeconds:F1}s (expect ~7s)");
+            return 1;
+        }
+
+        // 2) 429 on attempt 1 → retry, success on attempt 2 → returns translated text.
+        var retryHandler = new FakeHttpHandler(429, 200);
+        var retryClient = new TranslationClient("k", "https://api.example.com", "m", "auto", "id", retryHandler);
+        var r2 = retryClient.TranslateAsync("hello").GetAwaiter().GetResult();
+        if (r2 != "hasil dari API" || retryHandler.Attempts != 2)
+        {
+            Console.WriteLine($"FAIL: 429 retry — result={r2}, attempts={retryHandler.Attempts}");
+            return 1;
+        }
+
+        // 3) 401 → TranslationException after 1 attempt, no retry.
+        var authHandler = new FakeHttpHandler(401, 200);
+        var authClient = new TranslationClient("k", "https://api.example.com", "m", "auto", "id", authHandler);
+        try
+        {
+            authClient.TranslateAsync("hello").GetAwaiter().GetResult();
+            Console.WriteLine("FAIL: 401 did not throw TranslationException");
+            return 1;
+        }
+        catch (TranslationException)
+        {
+            if (authHandler.Attempts != 1)
+            {
+                Console.WriteLine($"FAIL: 401 retried — attempts={authHandler.Attempts}");
+                return 1;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"FAIL: 401 threw wrong type {ex.GetType().Name}");
+            return 1;
+        }
+
+        Console.WriteLine("PASS: TranslationClient timeout(4 attempts, ~7s) + 429-retry + 401-no-retry");
+        return 0;
+    }
+
+    // ---------- T13: TranslationCacheRepository ----------
+
+    private static int SelfCheckT13()
+    {
+        var dbPath = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t13", "profiles.db");
+        if (File.Exists(dbPath)) File.Delete(dbPath);
+        var db = new Database(dbPath);
+        db.EnsureSchema();
+        var cache = new TranslationCacheRepository(db);
+
+        // Empty → miss.
+        if (cache.Get("Hello", "id") is not null)
+        {
+            Console.WriteLine("FAIL: cache hit on empty cache");
+            return 1;
+        }
+
+        // Hash is deterministic + distinct per text/lang.
+        if (TranslationCacheRepository.Hash("Hello", "id") != TranslationCacheRepository.Hash("Hello", "id")
+            || TranslationCacheRepository.Hash("Hello", "id") == TranslationCacheRepository.Hash("Halo", "id")
+            || TranslationCacheRepository.Hash("Hello", "id") == TranslationCacheRepository.Hash("Hello", "en"))
+        {
+            Console.WriteLine("FAIL: hash not deterministic/distinct");
+            return 1;
+        }
+
+        cache.Put("Hello", "Halo", "id");
+        if (cache.Get("Hello", "id") != "Halo")
+        {
+            Console.WriteLine("FAIL: Get after Put missed");
+            return 1;
+        }
+        if (cache.Get("Hello", "en") is not null)
+        {
+            Console.WriteLine("FAIL: target-lang collision");
+            return 1;
+        }
+
+        // Upsert overwrites, no duplicate rows.
+        cache.Put("Hello", "Halo baru", "id");
+        if (cache.Get("Hello", "id") != "Halo baru")
+        {
+            Console.WriteLine("FAIL: upsert did not overwrite");
+            return 1;
+        }
+        using (var conn = db.Open())
+        {
+            int rows = conn.QuerySingle<int>("SELECT COUNT(*) FROM TranslationCache WHERE SourceText='Hello'");
+            if (rows != 1)
+            {
+                Console.WriteLine($"FAIL: upsert left {rows} rows");
+                return 1;
+            }
+        }
+
+        Console.WriteLine("PASS: TranslationCache get/put/upsert/hash-distinct");
+        return 0;
+    }
 
     private static int SelfCheckT9()
     {
