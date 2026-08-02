@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <!-- T2: ship traineddata files next to the binary -->
-    <None Update="..\..\assets\tessdata\*.traineddata" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\tessdata\*.traineddata" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
