@@ -1,11 +1,13 @@
+using Dapper;
 using GameSubTranslate.Config;
+using GameSubTranslate.Profiles;
 using GameSubTranslate.Storage;
 
 namespace GameSubTranslate.Prototype;
 
 /// <summary>
 /// Minimal assert-style self-checks run via CLI (no test framework, per CLAUDE.md).
-/// Usage: --selfcheck-t3, --selfcheck-t4
+/// Usage: --selfcheck-t3, --selfcheck-t4, --selfcheck-t5
 /// </summary>
 internal static class SelfChecks
 {
@@ -13,6 +15,7 @@ internal static class SelfChecks
     {
         "--selfcheck-t3" => SelfCheckT3(),
         "--selfcheck-t4" => SelfCheckT4(),
+        "--selfcheck-t5" => SelfCheckT5(),
         _ => SelfCheckT3(),
     };
 
@@ -99,6 +102,86 @@ internal static class SelfChecks
         db.EnsureSchema();
 
         Console.WriteLine("PASS: SQLite schema created (3 tables) + idempotent");
+        return 0;
+    }
+
+    private static int SelfCheckT5()
+    {
+        var dbPath = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t5", "profiles.db");
+        if (File.Exists(dbPath)) File.Delete(dbPath);
+        var db = new Database(dbPath);
+        db.EnsureSchema();
+        var repo = new ProfileRepository(db);
+
+        // Create with 2 regions.
+        var p = new GameProfile
+        {
+            Name = "Test Game",
+            ExecutableName = "test.exe",
+            TargetLang = "en",
+            Regions = new List<CaptureRegion>
+            {
+                new() { RegionName = "Subtitle", X = 10, Y = 20, Width = 800, Height = 100, IsActiveDefault = true, SortOrder = 0 },
+                new() { RegionName = "Dialog", X = 0, Y = 0, Width = 640, Height = 200, SortOrder = 1 },
+            },
+        };
+        int id = repo.Create(p);
+        if (id <= 0)
+        {
+            Console.WriteLine("FAIL: Create returned non-positive id");
+            return 1;
+        }
+
+        // GetAll returns the row.
+        var all = repo.GetAll().ToList();
+        if (all.Count != 1 || all[0].Name != "Test Game")
+        {
+            Console.WriteLine($"FAIL: GetAll count={all.Count}, name={all.FirstOrDefault()?.Name}");
+            return 1;
+        }
+
+        // GetById loads regions.
+        var loaded = repo.GetById(id);
+        if (loaded is null || loaded.Regions.Count != 2)
+        {
+            Console.WriteLine($"FAIL: GetById regions={loaded?.Regions.Count}");
+            return 1;
+        }
+        if (loaded.Regions[0].IsActiveDefault != true || loaded.Regions[0].ProfileId != id)
+        {
+            Console.WriteLine("FAIL: region fields not round-tripped");
+            return 1;
+        }
+
+        // Update name + swap regions.
+        loaded.Name = "Test Game Renamed";
+        loaded.Regions = new List<CaptureRegion> { loaded.Regions[1] };
+        repo.Update(loaded);
+        var updated = repo.GetById(id);
+        if (updated is null || updated.Name != "Test Game Renamed" || updated.Regions.Count != 1)
+        {
+            Console.WriteLine($"FAIL: update name={updated?.Name}, regions={updated?.Regions.Count}");
+            return 1;
+        }
+
+        // Delete.
+        repo.Delete(id);
+        if (repo.GetById(id) is not null)
+        {
+            Console.WriteLine("FAIL: Delete did not remove profile");
+            return 1;
+        }
+        using (var conn = db.Open())
+        {
+            var regionCount = conn.QuerySingle<int>("SELECT COUNT(*) FROM CaptureRegion WHERE ProfileId=@Id", new { Id = id });
+            if (regionCount != 0)
+            {
+                Console.WriteLine($"FAIL: cascade delete left {regionCount} orphan regions");
+                return 1;
+            }
+        }
+
+        Console.WriteLine("PASS: ProfileRepository CRUD + regions + cascade delete");
         return 0;
     }
 }
