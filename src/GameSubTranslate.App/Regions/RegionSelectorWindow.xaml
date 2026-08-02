@@ -10,11 +10,19 @@
           MouseLeftButtonDown="RootGrid_MouseLeftButtonDown"
           MouseMove="RootGrid_MouseMove"
           MouseLeftButtonUp="RootGrid_MouseLeftButtonUp">
-        <!-- top hint bar -->
-        <Border Background="#CC000000" Padding="12,6" HorizontalAlignment="Center" VerticalAlignment="Top" CornerRadius="4" Margin="0,20,0,0">
-            <TextBlock x:Name="HintText" Foreground="White" FontSize="14"
-                       Text="Drag to select subtitle region. ENTER = confirm, ESC = cancel."/>
-        </Border>
+        <!-- top bar: hint + monitor picker -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,20,0,0">
+            <Border Background="#CC000000" Padding="12,6" CornerRadius="4" Margin="0,0,8,0">
+                <TextBlock x:Name="HintText" Foreground="White" FontSize="14"
+                           Text="Drag to select subtitle region. ENTER = confirm, ESC = cancel."/>
+            </Border>
+            <Border x:Name="MonitorPickerPanel" Background="#CC000000" Padding="8,4" CornerRadius="4" Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Foreground="White" FontSize="13" Text="Monitor:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="MonitorPicker" FontSize="13" MinWidth="120" SelectionChanged="MonitorPicker_SelectionChanged"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
 
         <!-- live coords readout -->
         <Border Background="#CC000000" Padding="10,4" HorizontalAlignment="Left" VerticalAlignment="Bottom" CornerRadius="4" Margin="20,0,0,20">
