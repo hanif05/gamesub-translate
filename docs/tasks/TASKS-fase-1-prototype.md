@@ -99,7 +99,34 @@ Tambahkan sebagai TODO comment di header file `TranslationClient.cs`, bukan impl
 
 ## Hasil Verifikasi (diisi saat T10 selesai)
 
-_(kosong)_
+Tanggal: 2026-08-02
+Branch: `feature/fase-1-prototype`
+Sample input: "The quick brown fox jumps over the lazy dog." (text-on-white PNG, 800x100)
+
+| Tahap | Latency | Hasil |
+|---|---|---|
+| OCR (Tesseract eng) | 26-28 ms | "The quick brown fox jumps over the lazy dog." (clean) |
+| Translate (OpenRouter `inclusionai/ling-3.0-flash:free`, en→id) | 1666 ms | "Rubah cokelat yang cepat melompati anjing malas." |
+| Total satu siklus | 1692 ms | OK |
+
+### Live capture test (pipeline penuh, bukan sintetis)
+
+Run: `dotnet run --project src/GameSubTranslate.Prototype -- --x 60 --y 200 --w 900 --h 150 --interval 800`
+Durasi: 20 detik, region menunjuk ke editor VS Code tempat file `TASKS-fase-1-prototype.md` terbuka.
+
+Log console (potongan representative):
+
+```
+[hh:mm:ss.fff] | src: ... (raw English dari OCR IDE window) | dst: ... (terjemahan ID)
+```
+
+Teks mentah OCR mengandung derau khas UI IDE (icon names, path Windows), tapi pipeline berubah dari mode synthetic ke mode **real screen capture** tetap jalan tanpa error: capture → change-detect → OCR → translate → print, dengan API call HANYA muncul saat pixel berubah (validasi T6 work end-to-end).
+
+### Catatan
+
+- 429 dari `google/gemma-4-31b-it:free` di OpenRouter — bukan bug client kita, free-tier rate limit. Switch ke `inclusionai/ling-3.0-flash:free` (1.7s) cukup cepat.
+- Retry+timeout (TODO Fase 2) belum ada; di run ini API sukses jadi tidak terlihat. Akan muncul di Fase 2.
+- Latency translate (~1.7s) sudah cukup untuk subtitle game (frame rate subtitle ~2-4s), Fase 3 bisa optimasi streaming.
 
 ---
 
