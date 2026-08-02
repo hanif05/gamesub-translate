@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 // - Retry with exponential backoff (max 3 attempts: 1s -> 2s -> 4s)
 // - Specific exception on final failure so pipeline can log and skip without crashing
 
-namespace GameSubTranslate.Prototype.Translation;
+namespace GameSubTranslate.Translation;
 
 public sealed class TranslationClient
 {

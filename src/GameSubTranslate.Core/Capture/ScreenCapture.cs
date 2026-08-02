@@ -2,7 +2,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 
-namespace GameSubTranslate.Prototype.Capture;
+namespace GameSubTranslate.Capture;
 
 /// <summary>
 /// Fase 1 capture: GDI+ CopyFromScreen. Bounded by virtual screen bounds.

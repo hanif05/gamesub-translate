@@ -1,4 +1,4 @@
-namespace GameSubTranslate.Prototype.Ocr;
+namespace GameSubTranslate.Ocr;
 
 public interface IOcrEngine
 {

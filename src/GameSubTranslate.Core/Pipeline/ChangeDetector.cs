@@ -1,6 +1,6 @@
 using System.Drawing;
 
-namespace GameSubTranslate.Prototype.Pipeline;
+namespace GameSubTranslate.Pipeline;
 
 public static class ChangeDetector
 {

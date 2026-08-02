@@ -1,7 +1,7 @@
+using GameSubTranslate.Config;
+using GameSubTranslate.Ocr;
+using GameSubTranslate.Pipeline;
 using GameSubTranslate.Prototype;
-using GameSubTranslate.Prototype.Config;
-using GameSubTranslate.Prototype.Ocr;
-using GameSubTranslate.Prototype.Pipeline;
 
 var cli = CliArgsParser.Parse(args);
 var cfg = AppConfig.FromEnv();
@@ -12,6 +12,6 @@ Console.WriteLine($"region=({cli.X},{cli.Y}) {cli.W}x{cli.H} interval={cli.Inter
 var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
-var pipeline = new TranslatePipeline(cli, ocr, cfg);
+var pipeline = new TranslatePipeline(cli.X, cli.Y, cli.W, cli.H, cli.IntervalMs, ocr, cfg);
 await pipeline.RunAsync(cts.Token);
 Console.WriteLine("stopped.");

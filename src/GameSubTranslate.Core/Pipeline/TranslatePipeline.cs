@@ -1,20 +1,24 @@
-using GameSubTranslate.Prototype.Capture;
-using GameSubTranslate.Prototype.Config;
-using GameSubTranslate.Prototype.Ocr;
-using GameSubTranslate.Prototype.Translation;
+using GameSubTranslate.Capture;
+using GameSubTranslate.Config;
+using GameSubTranslate.Ocr;
+using GameSubTranslate.Translation;
 
-namespace GameSubTranslate.Prototype.Pipeline;
+namespace GameSubTranslate.Pipeline;
 
+/// <summary>
+/// Fase 1 end-to-end pipeline. Refactored into a service in T16 (Fase 2).
+/// Kept minimal here so Prototype can still run as a CLI smoke test.
+/// </summary>
 public sealed class TranslatePipeline
 {
-    private readonly CliArgs _args;
+    private readonly int _x, _y, _w, _h, _intervalMs;
     private readonly IOcrEngine _ocr;
     private readonly TranslationClient? _translator;
     private readonly bool _translationEnabled;
 
-    public TranslatePipeline(CliArgs args, IOcrEngine ocr, AppConfig cfg)
+    public TranslatePipeline(int x, int y, int w, int h, int intervalMs, IOcrEngine ocr, AppConfig cfg)
     {
-        _args = args;
+        _x = x; _y = y; _w = w; _h = h; _intervalMs = intervalMs;
         _ocr = ocr;
         _translationEnabled = cfg.TranslationEnabled;
         _translator = _translationEnabled
@@ -31,11 +35,11 @@ public sealed class TranslatePipeline
         {
             try
             {
-                byte[] png = ScreenCapture.CaptureRegion(_args.X, _args.Y, _args.W, _args.H);
+                byte[] png = ScreenCapture.CaptureRegion(_x, _y, _w, _h);
 
                 if (!ChangeDetector.IsChanged(png, lastPng))
                 {
-                    await Task.Delay(_args.IntervalMs, ct);
+                    await Task.Delay(_intervalMs, ct);
                     continue;
                 }
                 lastPng = png;
@@ -43,7 +47,7 @@ public sealed class TranslatePipeline
                 string text = _ocr.Recognize(png);
                 if (string.IsNullOrWhiteSpace(text) || text == lastText)
                 {
-                    await Task.Delay(_args.IntervalMs, ct);
+                    await Task.Delay(_intervalMs, ct);
                     continue;
                 }
                 lastText = text;
@@ -64,7 +68,7 @@ public sealed class TranslatePipeline
                 Console.Error.WriteLine($"[tick-error] {ex.GetType().Name}: {ex.Message}");
             }
 
-            await Task.Delay(_args.IntervalMs, ct);
+            await Task.Delay(_intervalMs, ct);
         }
     }
 }

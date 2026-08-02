@@ -1,6 +1,6 @@
 using Tesseract;
 
-namespace GameSubTranslate.Prototype.Ocr;
+namespace GameSubTranslate.Ocr;
 
 /// <summary>
 /// Tesseract wrapper. One TesseractEngine instance is reused per process
@@ -13,7 +13,8 @@ public sealed class TesseractOcrEngine : IOcrEngine, IDisposable
 
     public TesseractOcrEngine(string? tessdataPath = null, string lang = "eng")
     {
-        var path = tessdataPath ?? AppContext.BaseDirectory;
+        // Built output ships traineddata under a tessdata/ subfolder (see .csproj Content Link).
+        var path = tessdataPath ?? Path.Combine(AppContext.BaseDirectory, "tessdata");
         _engine = new TesseractEngine(path, lang, EngineMode.Default);
     }
 
