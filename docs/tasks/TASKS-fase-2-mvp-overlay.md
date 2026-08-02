@@ -304,6 +304,7 @@ Double-click icon → show MainWindow.
 **Output**: update `App.xaml`, `App.xaml.cs`.
 **Done when**: app jalan, icon muncul di system tray. Right-click → context menu → semua aksi bekerja. Close MainWindow (X) tidak keluar app, hanya hide. Pilih Exit → app fully shutdown.
 **Depends on**: T19, T20, T21, T23.
+**Status**: ✅ DONE (tray icon + context menu Show/Pause/Settings/Exit; close window → hide; Exit → shutdown. Verified: process alive after window close)
 
 #### T25. Auto-load profile by foreground executable
 **Deskripsi**: Pakai `Win32` `GetForegroundWindow` + `GetWindowThreadProcessId` + `QueryFullProcessImageName` untuk deteksi exe name foreground window. Background `Timer` di App cek tiap 2 detik. Kalau foreground exe match `ExecutableName` di salah satu profile → auto-load profile itu (set active region ke `IsActiveDefault`). Frontend window ke MainWindow atau settings window TIDAK trigger switch.

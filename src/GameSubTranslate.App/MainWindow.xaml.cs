@@ -251,7 +251,11 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Disposes the pipeline when the app exits without closing the window first.</summary>
-    public void Dispose() => _pipeline?.Dispose();
+    public void Dispose()
+    {
+        _pipeline?.Dispose();
+        _pipeline = null; // idempotent: hotkey handler + tray Exit can both reach here.
+    }
 
     /// <summary>T23: applies freshly-saved settings (pipeline rebuilds on next start to pick up new capture/lang config).</summary>
     public void ReloadSettings(AppSettings fresh)

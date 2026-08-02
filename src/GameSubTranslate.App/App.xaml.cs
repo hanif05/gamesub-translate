@@ -1,9 +1,13 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media.Imaging;
 using GameSubTranslate.App.Overlay;
 using GameSubTranslate.App.Settings;
 using GameSubTranslate.Config;
 using GameSubTranslate.Hotkeys;
 using GameSubTranslate.Storage;
+using Hardcodet.Wpf.TaskbarNotification;
+using WinForms = System.Windows.Forms;
 
 namespace GameSubTranslate.App;
 
@@ -13,6 +17,7 @@ public partial class App : System.Windows.Application
     private GlobalHotkeyManager? _hotkeys;
     private MainWindow? _main;
     private SettingsWindow? _settingsWindow;
+    private TaskbarIcon? _tray;
     private AppSettings _settings = new();
 
     protected override void OnStartup(System.Windows.StartupEventArgs e)
@@ -34,7 +39,58 @@ public partial class App : System.Windows.Application
         _hotkeys = new GlobalHotkeyManager();
         RegisterHotkeys(_settings);
 
+        InitTray();
+
+        // T24: closing the main window hides it (app keeps running in the tray).
+        _main.Closing += (_, e) =>
+        {
+            e.Cancel = true;
+            _main.Hide();
+        };
         _main.Show();
+    }
+
+    /// <summary>T24: system tray icon + context menu. "Exit" is the only path that truly shuts the app down.</summary>
+    private void InitTray()
+    {
+        _tray = (TaskbarIcon)Resources["TrayIcon"];
+        _tray.Visibility = System.Windows.Visibility.Visible;
+
+        var menu = new System.Windows.Controls.ContextMenu();
+        var overlay = new MenuItem { Header = "Show / Hide Overlay" };
+        overlay.Click += (_, _) => ToggleOverlay();
+        var pause = new MenuItem { Header = "Pause / Resume" };
+        pause.Click += (_, _) => TogglePause();
+        var settings = new MenuItem { Header = "Settings" };
+        settings.Click += (_, _) => OpenSettings();
+        var exit = new MenuItem { Header = "Exit" };
+        exit.Click += (_, _) => ExitApp();
+        menu.Items.Add(overlay);
+        menu.Items.Add(pause);
+        menu.Items.Add(settings);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(exit);
+        _tray.ContextMenu = menu;
+
+        _tray.TrayMouseDoubleClick += (_, _) => ShowMainWindow();
+    }
+
+    private void ShowMainWindow()
+    {
+        if (_main is null) return;
+        _main.Show();
+        _main.Activate();
+        _main.WindowState = System.Windows.WindowState.Normal;
+    }
+
+    /// <summary>T24: full shutdown — release hotkeys + pipeline, clear tray icon, close overlay.</summary>
+    private void ExitApp()
+    {
+        _hotkeys?.Dispose();
+        _main?.Dispose();
+        _main?.Close(); // bypasses the Closing-cancel override → real close → OnExit
+        _tray?.Dispose();
+        Shutdown();
     }
 
     /// <summary>(Re)registers all global hotkeys from settings — called at startup and after settings save.</summary>
@@ -96,6 +152,7 @@ public partial class App : System.Windows.Application
     {
         _hotkeys?.Dispose();
         _main?.Dispose();
+        _tray?.Dispose();
         base.OnExit(e);
     }
 }
