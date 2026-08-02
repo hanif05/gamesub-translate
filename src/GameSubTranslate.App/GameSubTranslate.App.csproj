@@ -9,6 +9,8 @@
     <RootNamespace>GameSubTranslate</RootNamespace>
     <AssemblyName>GameSubTranslate.App</AssemblyName>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- Transitive from Core's Win2D → WindowsAppSDK; needed for `dotnet build` without VS. -->
+    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
   </PropertyGroup>
 
   <ItemGroup>

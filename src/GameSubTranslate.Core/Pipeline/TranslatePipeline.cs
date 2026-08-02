@@ -28,6 +28,7 @@ public sealed class TranslatePipeline
 
     public async Task RunAsync(CancellationToken ct)
     {
+        using var capture = ScreenCapture.ForMonitorAt(_x, _y);
         byte[]? lastPng = null;
         string? lastText = null;
 
@@ -35,7 +36,7 @@ public sealed class TranslatePipeline
         {
             try
             {
-                byte[] png = ScreenCapture.CaptureRegion(_x, _y, _w, _h);
+                byte[] png = capture.CaptureRegion(_x, _y, _w, _h);
 
                 if (!ChangeDetector.IsChanged(png, lastPng))
                 {

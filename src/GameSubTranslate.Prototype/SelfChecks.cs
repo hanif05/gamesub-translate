@@ -1,4 +1,5 @@
 using Dapper;
+using System.Drawing;
 using GameSubTranslate.Config;
 using GameSubTranslate.Profiles;
 using GameSubTranslate.Storage;
@@ -17,6 +18,8 @@ internal static class SelfChecks
         "--selfcheck-t4" => SelfCheckT4(),
         "--selfcheck-t5" => SelfCheckT5(),
         "--selfcheck-t9" => SelfCheckT9(),
+        "--selfcheck-t10" => SelfCheckT10(),
+        "--selfcheck-t11" => SelfCheckT11(),
         _ => SelfCheckT3(),
     };
 
@@ -185,6 +188,125 @@ internal static class SelfChecks
         Console.WriteLine("PASS: ProfileRepository CRUD + regions + cascade delete");
         return 0;
     }
+
+    private static int SelfCheckT10()
+    {
+        // Grab a small region near the top-left of the primary monitor and verify the
+        // Windows.Graphics.Capture pipeline returns a PNG of the right dimensions.
+        var primary = System.Windows.Forms.Screen.PrimaryScreen!;
+        var sx = primary.Bounds.X;
+        var sy = primary.Bounds.Y;
+        const int w = 320, h = 80;
+
+        using var cap = GameSubTranslate.Capture.ScreenCapture.ForMonitorAt(sx, sy);
+        byte[] png = cap.CaptureRegion(sx, sy, w, h);
+
+        if (png.Length == 0)
+        {
+            Console.WriteLine("FAIL: empty capture");
+            return 1;
+        }
+        using var img = Image.FromStream(new MemoryStream(png));
+        if (img.Width != w || img.Height != h)
+        {
+            Console.WriteLine($"FAIL: PNG size {img.Width}x{img.Height}, expected {w}x{h}");
+            return 1;
+        }
+
+        // Second frame: same region → also decodeable (validates repeated capture).
+        byte[] png2 = cap.CaptureRegion(sx, sy, w, h);
+        if (png2.Length == 0)
+        {
+            Console.WriteLine("FAIL: second capture empty");
+            return 1;
+        }
+
+        Console.WriteLine($"PASS: WGC capture {w}x{h} PNG ({png.Length} bytes) + repeat");
+        return 0;
+    }
+
+    private static int SelfCheckT11()
+    {
+        // Synthetic frames: solid bg + a dark "text" bar. Identical copies → no change.
+        var imgA = MakeFrame("hello world");
+        var imgA2 = MakeFrame("hello world");
+        var imgB = MakeFrame("different words here");
+        var cd = GameSubTranslate.Pipeline.ChangeDetector.IsChanged;
+
+        // Identical (re-encode same pixels) → not changed.
+        if (cd(imgA, imgA2))
+        {
+            Console.WriteLine("FAIL: identical frames flagged as changed");
+            return 1;
+        }
+        // Different text → changed.
+        if (!cd(imgA, imgB))
+        {
+            Console.WriteLine("FAIL: different text not flagged as changed");
+            return 1;
+        }
+        // First capture (no prior) → changed.
+        if (!cd(imgA, null))
+        {
+            Console.WriteLine("FAIL: first frame (null prior) not flagged");
+            return 1;
+        }
+        // Null new frame → not changed.
+        if (cd(null, imgA))
+        {
+            Console.WriteLine("FAIL: null new frame flagged");
+            return 1;
+        }
+
+        // Noise tolerance: same frame with a few random pixels flipped → not changed.
+        var imgA3 = AddNoise(imgA, flips: 40);
+        if (cd(imgA, imgA3))
+        {
+            Console.WriteLine("FAIL: small noise flagged as changed");
+            return 1;
+        }
+
+        Console.WriteLine("PASS: ChangeDetector grid-compare identical/different/first-frame/noise-tolerance");
+        return 0;
+    }
+
+    private static byte[] MakeFrame(string text, float sizeMul = 1f)
+    {
+        const int w = 400, h = 60;
+        using var bmp = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using (var g = Graphics.FromImage(bmp))
+        {
+            g.Clear(Color.White);
+            using var font = new Font("Arial", 18f * sizeMul, FontStyle.Regular, GraphicsUnit.Pixel);
+            using var brush = new SolidBrush(Color.Black);
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+            g.DrawString(text, font, brush, 10, 10);
+        }
+        using var ms = new MemoryStream();
+        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+        return ms.ToArray();
+    }
+
+    /// <summary>Flip `flips` random pixels to simulate capture noise / anti-aliasing jitter.</summary>
+    private static byte[] AddNoise(byte[] png, int flips)
+    {
+        using var img = Image.FromStream(new MemoryStream(png));
+        using var bmp = new Bitmap(img);
+        var rnd = new Random(42);
+        for (int i = 0; i < flips; i++)
+        {
+            int x = rnd.Next(bmp.Width);
+            int y = rnd.Next(bmp.Height);
+            var c = bmp.GetPixel(x, y);
+            int delta = rnd.Next(2) == 0 ? -12 : 12;
+            bmp.SetPixel(x, y, Color.FromArgb(255, Clamp(c.R + delta), Clamp(c.G + delta), Clamp(c.B + delta)));
+        }
+        using var ms = new MemoryStream();
+        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+        return ms.ToArray();
+    }
+
+    private static int Clamp(int v) => Math.Clamp(v, 0, 255);
 
     private static int SelfCheckT9()
     {

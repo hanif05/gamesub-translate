@@ -7,6 +7,8 @@
     <Nullable>enable</Nullable>
     <RootNamespace>GameSubTranslate.Prototype</RootNamespace>
     <AssemblyName>GameSubTranslate.Prototype</AssemblyName>
+    <!-- Transitive from Core's Win2D → WindowsAppSDK; needed for `dotnet build` without VS. -->
+    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
   </PropertyGroup>
 
   <ItemGroup>

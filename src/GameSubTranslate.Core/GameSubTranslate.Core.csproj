@@ -7,9 +7,15 @@
     <RootNamespace>GameSubTranslate</RootNamespace>
     <AssemblyName>GameSubTranslate.Core</AssemblyName>
     <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Win2D 1.3.1 depends on Microsoft.WindowsAppSDK, whose MrtCore.PriGen.targets
+         requires Visual-Studio-only MSBuild tasks that break `dotnet build` on a
+         non-VS machine. Core is a non-XAML classlib, so PRI tooling is unneeded. -->
+    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.1" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />

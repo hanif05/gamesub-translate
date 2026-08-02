@@ -142,6 +142,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: rewrite `src/Core/Capture/ScreenCapture.cs`.
 **Done when**: panggil `CaptureRegion(x, y, w, h)` dari test program, hasilnya PNG dengan dimensi sesuai region dan konten yang benar (compare dengan screenshot manual).
 **Depends on**: T1.
+**Status**: ✅ DONE (verified --selfcheck-t10 + CLI OCR)
 
 #### T11. Change detection: perceptual hash
 **Deskripsi**: Upgrade `ChangeDetector.cs`. Fase 1 pakai byte-compare (kurang robust). Fase 2: perceptual hash (pHash) 64-bit.
