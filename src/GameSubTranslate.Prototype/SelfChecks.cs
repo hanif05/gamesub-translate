@@ -16,6 +16,7 @@ internal static class SelfChecks
         "--selfcheck-t3" => SelfCheckT3(),
         "--selfcheck-t4" => SelfCheckT4(),
         "--selfcheck-t5" => SelfCheckT5(),
+        "--selfcheck-t9" => SelfCheckT9(),
         _ => SelfCheckT3(),
     };
 
@@ -182,6 +183,71 @@ internal static class SelfChecks
         }
 
         Console.WriteLine("PASS: ProfileRepository CRUD + regions + cascade delete");
+        return 0;
+    }
+
+    private static int SelfCheckT9()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t9");
+        var dbPath = Path.Combine(tmp, "profiles.db");
+        if (File.Exists(dbPath)) File.Delete(dbPath);
+        var db = new Database(dbPath);
+        db.EnsureSchema();
+        var repo = new ProfileRepository(db);
+
+        // Profile with 2 regions.
+        int id = repo.Create(new GameProfile
+        {
+            Name = "Region Switcher Test",
+            Regions = new List<CaptureRegion>
+            {
+                new() { RegionName = "A", X = 0, Y = 0, Width = 100, Height = 50, IsActiveDefault = true, SortOrder = 0 },
+                new() { RegionName = "B", X = 100, Y = 0, Width = 100, Height = 50, SortOrder = 1 },
+            },
+        });
+
+        // Service state is persisted to settings.json; fresh service must restore it.
+        var settingsFile = Path.Combine(tmp, "settings.json");
+        var store = new SettingsStore(settingsFile);
+        var app = store.Load();
+
+        var svc = new ProfileService(repo, store, app);
+        svc.SetActiveProfile(id);
+
+        // ActiveProfile set, default region (A) auto-selected.
+        if (svc.ActiveProfileId != id || svc.ActiveRegion()?.RegionName != "A")
+        {
+            Console.WriteLine($"FAIL: initial active profile/region. profile={svc.ActiveProfileId}, region={svc.ActiveRegion()?.RegionName}");
+            return 1;
+        }
+
+        // Switch to region B.
+        var regionB = svc.ActiveProfile!.Regions.First(r => r.RegionName == "B");
+        svc.SetActiveRegion(regionB.Id);
+        if (svc.ActiveRegion()?.RegionName != "B")
+        {
+            Console.WriteLine("FAIL: SetActiveRegion did not switch");
+            return 1;
+        }
+
+        // New service instance (simulates restart) restores B.
+        var svc2 = new ProfileService(repo, new SettingsStore(settingsFile), store.Load());
+        if (svc2.ActiveProfileId != id || svc2.ActiveRegion()?.RegionName != "B")
+        {
+            Console.WriteLine($"FAIL: restart did not restore. profile={svc2.ActiveProfileId}, region={svc2.ActiveRegion()?.RegionName}");
+            return 1;
+        }
+
+        // Clearing after delete works.
+        svc2.ClearActiveProfile();
+        var svc3 = new ProfileService(repo, new SettingsStore(settingsFile), store.Load());
+        if (svc3.ActiveProfileId is not null)
+        {
+            Console.WriteLine("FAIL: ClearActiveProfile not persisted");
+            return 1;
+        }
+
+        Console.WriteLine("PASS: ProfileService active region switch + persistence across restart");
         return 0;
     }
 }

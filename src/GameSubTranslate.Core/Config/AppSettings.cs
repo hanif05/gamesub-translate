@@ -25,6 +25,10 @@ public sealed class AppSettings
     public string HotkeyOpenSettings { get; set; } = "Ctrl+Alt+S";
     public string HotkeyManualCapture { get; set; } = "Ctrl+Alt+Space";
 
+    // Last-active state (T9) so the active region survives restarts.
+    public int? ActiveProfileId { get; set; }
+    public int? ActiveRegionId { get; set; }
+
     public bool TranslationEnabled =>
         !string.IsNullOrWhiteSpace(ApiKey) &&
         !string.IsNullOrWhiteSpace(BaseUrl) &&

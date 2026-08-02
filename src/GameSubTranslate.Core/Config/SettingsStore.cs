@@ -49,6 +49,8 @@ public sealed class SettingsStore
                 HotkeyPauseCapture = dto.HotkeyPauseCapture ?? "Ctrl+Alt+P",
                 HotkeyOpenSettings = dto.HotkeyOpenSettings ?? "Ctrl+Alt+S",
                 HotkeyManualCapture = dto.HotkeyManualCapture ?? "Ctrl+Alt+Space",
+                ActiveProfileId = dto.ActiveProfileId,
+                ActiveRegionId = dto.ActiveRegionId,
             };
         }
         catch
@@ -81,6 +83,8 @@ public sealed class SettingsStore
             HotkeyPauseCapture = s.HotkeyPauseCapture,
             HotkeyOpenSettings = s.HotkeyOpenSettings,
             HotkeyManualCapture = s.HotkeyManualCapture,
+            ActiveProfileId = s.ActiveProfileId,
+            ActiveRegionId = s.ActiveRegionId,
         };
 
         File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, JsonOpts));
@@ -126,5 +130,7 @@ public sealed class SettingsStore
         public string? HotkeyPauseCapture { get; set; }
         public string? HotkeyOpenSettings { get; set; }
         public string? HotkeyManualCapture { get; set; }
+        public int? ActiveProfileId { get; set; }
+        public int? ActiveRegionId { get; set; }
     }
 }

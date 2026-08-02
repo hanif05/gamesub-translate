@@ -17,6 +17,11 @@
             <Button Content="Refresh" Width="80" Click="Refresh_Click"/>
         </StackPanel>
 
-        <ListBox x:Name="ProfileList" SelectionMode="Single" DisplayMemberPath="Name"/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Active region:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox x:Name="RegionCombo" MinWidth="220" DisplayMemberPath="Display" SelectionChanged="RegionCombo_SelectionChanged"/>
+        </StackPanel>
+
+        <ListBox x:Name="ProfileList" SelectionMode="Single" DisplayMemberPath="Name" SelectionChanged="ProfileList_SelectionChanged"/>
     </DockPanel>
 </Window>
