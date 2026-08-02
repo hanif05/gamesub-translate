@@ -105,24 +105,28 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: file `src/App/MainWindow.xaml(.cs)`, `ProfileEditWindow.xaml(.cs)`.
 **Done when**: create profile via UI, restart app, profile masih ada. Delete bekerja, row hilang dari DB.
 **Depends on**: T2, T3, T5.
+**Status**: ✅ DONE (commit a81eeb3)
 
 #### T7. Region Selector: full-screen drag-select
 **Deskripsi**: Window baru `RegionSelectorWindow`. Saat dibuka, full-screen ke primary monitor (extend ke multi-monitor di T8), `WindowStyle=None`, `WindowState=Maximized`, `Topmost=true`, `Background=Transparent`, `AllowsTransparency=true`. Mouse cursor jadi crosshair, click+drag gambar rectangle semi-transparan (misal `Rectangle` dengan `Fill="#40FF0000"`), live update `Width/Height`. Tampilkan TextBlock kecil real-time dengan koordinat (x, y, w, h). ESC cancel, Enter/click kedua confirm. Saat confirm, return `CaptureRegion` ke caller via callback / `DialogResult`.
 **Output**: file `src/App/Regions/RegionSelectorWindow.xaml(.cs)`.
 **Done when**: dari `ProfileEditWindow` klik "Add Region" → RegionSelectorWindow muncul full-screen → drag rectangle di atas Notepad → confirm → koordinat muncul di form. Cancel dengan ESC tutup window tanpa save.
 **Depends on**: T6.
+**Status**: ✅ DONE (commit T7)
 
 #### T8. Multi-monitor support di Region Selector
 **Deskripsi**: Sebelum drag, kalau ada >1 monitor, tampilkan list monitor di top-bar RegionSelectorWindow (atau di step terpisah). User pilih monitor dulu, baru drag di monitor tersebut. Pakai `System.Windows.Forms.Screen.AllScreens` (WinForms interop) atau `Display.GetDisplays()` dari `Microsoft.Extensions.Hosting` — tapi yang paling simple: `System.Windows.Forms.Screen.AllScreens` (tambah `<UseWindowsForms>true</UseWindowsForms>` di `.csproj` App). Window RegionSelector diposisikan ke bounds monitor yang dipilih, drag di dalam bounds itu saja.
 **Output**: update `RegionSelectorWindow.xaml(.cs)`, simpan `MonitorIndex` di `CaptureRegion`.
 **Done when**: dengan 2 monitor, dropdown monitor muncul, pilih monitor 2 → window pindah ke monitor 2 → drag di sana → koordinat yang disimpan benar relatif ke virtual screen.
 **Depends on**: T7.
+**Status**: ✅ DONE (commit f13fbf3)
 
 #### T9. Region switcher aktif: switch region dalam 1 profile
 **Deskripsi**: Di MainWindow atau tray icon (T24), user bisa pilih region aktif dari dropdown list region di profile yang sedang loaded. Pilih region → simpan di memory (tidak perlu ke DB setiap kali, kecuali user klik "Save" — atau auto-save kalau simple). Hotkey untuk cycle region ditambahkan di T22.
 **Output**: dropdown region di MainWindow + method `ProfileService.SetActiveRegion(int regionId)`.
 **Done when**: profile dengan 2 region, pilih region A di dropdown → pipeline pakai koordinat A; pilih region B → koordinat B. Persist pilihan saat restart app (simpan di `AppSettings` atau tabel baru `LastActiveState`).
 **Depends on**: T6, T7.
+**Status**: ✅ DONE (commit db79db4, verified --selfcheck-t9)
 
 ---
 
