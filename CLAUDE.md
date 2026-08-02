@@ -90,9 +90,18 @@ Kalau env var kosong, `TranslationClient` harus skip pemanggilan API (bukan cras
 
 ## Yang Harus Dibaca Sebelum Mulai Kerja
 
-1. `docs/PRD.md` — requirement lengkap & konteks produk
+1. `PRD-Auto-Translate-Subtitle-Game.md` — requirement lengkap & konteks produk
 2. `docs/tasks/TASKS-fase-<N>-*.md` — task aktif yang sedang dikerjakan (baca checkbox untuk tahu progress terakhir)
 3. Section "Known Gotchas" di atas — supaya tidak mengulang masalah yang sudah pernah ditemukan
+
+## Git Flow Rules
+- Selalu cek branch aktif sebelum mulai bekerja.
+- Jangan pernah mengerjakan task langsung di `main` atau `develop`.
+- Untuk setiap fitur gunakan branch `feature/<nama-fitur>`.
+- Untuk bug gunakan branch `fix/<nama-bug>`.
+- Jika branch yang diperlukan belum ada, buat dari branch dasar yang sesuai.
+- Jangan merge, squash, rebase, atau push ke branch utama kecuali diminta secara eksplisit oleh user.
+- Sebelum commit, pastikan `git status` bersih dari file yang tidak berkaitan dengan task.
 
 ## Alur Kerja per Task
 
