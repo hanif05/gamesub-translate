@@ -70,6 +70,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 - Run app, set API key via `SettingsStore`, restart, key terbaca kembali.
 - Buka file `settings.json` manual — field `ApiKey` terlihat sebagai base64 blob, bukan plaintext.
 - Kalau file corrupt / hilang → `Load()` return default `AppSettings` baru, bukan crash.
+**Status**: ✅ DONE (commit 2a41024, verified --selfcheck-t3)
 **Depends on**: T1.
 
 #### T4. SQLite + Dapper: schema + migration
@@ -82,6 +83,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 - `Database` class: buka connection, jalankan `EnsureSchema()` sekali di startup. Pakai `SqliteConnection` per-query (Dapper style, simple).
 **Output**: file `src/Core/Storage/Database.cs`, `Migrations/Schema.sql` (atau inline string di C#).
 **Done when**: app startup dengan folder `%APPDATA%/GameSubTranslate/` kosong → file `profiles.db` terbuat dengan 3 tabel. Pakai `sqlite3` CLI (atau DB Browser for SQLite) verify schema.
+**Status**: ✅ DONE (commit 09fa7f4, verified --selfcheck-t4)
 **Depends on**: T1.
 
 ---
