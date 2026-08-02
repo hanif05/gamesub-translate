@@ -49,12 +49,14 @@ Kode `OcrEngine`, `ChangeDetector`, `TranslationClient`, `Config/AppConfig` dari
 Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype → Core kalau Prototype masih mau jalan independen untuk testing.
 **Output**: solution build OK dengan 3 project, `Prototype` masih bisa run seperti Fase 1.
 **Done when**: `dotnet build` dari root sukses 0 error. `dotnet run --project src/GameSubTranslate.Prototype -- --x 0 --y 0 --w 100 --h 100` masih jalan seperti Fase 1.
+**Status**: ✅ DONE (commit 5082aec)
 **Depends on**: —
 
 #### T2. WPF App skeleton
 **Deskripsi**: Di `GameSubTranslate.App`, bikin `App.xaml` (tanpa StartupUri) + `MainWindow.xaml` (placeholder `<TextBlock Text="GameSubTranslate"/>`). Override `OnStartup` di `App.xaml.cs` untuk show `MainWindow`. Set `ShutdownMode=OnExplicitShutdown` (window lain seperti overlay & region-selector akan handle lifecycle sendiri).
 **Output**: `src/GameSubTranslate.App/App.xaml`, `MainWindow.xaml`, window muncul saat run.
 **Done when**: `dotnet run --project src/GameSubTranslate.App` launch WPF window dengan text "GameSubTranslate" terlihat.
+**Status**: ✅ DONE (T1 commit 5082aec sudah include App skeleton; verified window stays up)
 **Depends on**: T1.
 
 #### T3. Settings model + DPAPI-encrypted config file
