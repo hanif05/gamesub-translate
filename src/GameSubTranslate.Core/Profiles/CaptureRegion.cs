@@ -12,4 +12,9 @@ public sealed class CaptureRegion
     public int MonitorIndex { get; set; }
     public bool IsActiveDefault { get; set; }
     public int SortOrder { get; set; }
+
+    /// <summary>Human-readable label for list bindings.</summary>
+    public string Display => string.IsNullOrWhiteSpace(RegionName)
+        ? $"({X},{Y}) {Width}x{Height} [m{MonitorIndex}]"
+        : $"{RegionName} - ({X},{Y}) {Width}x{Height} [m{MonitorIndex}]";
 }
