@@ -45,6 +45,8 @@ public sealed class SettingsStore
                 OverlayTextColor = dto.OverlayTextColor ?? "#FFFFFF",
                 OverlayBgColor = dto.OverlayBgColor ?? "#CC000000",
                 OverlayOpacity = dto.OverlayOpacity is >= 0 and <= 1 ? dto.OverlayOpacity : 1.0,
+                OverlayX = dto.OverlayX,
+                OverlayY = dto.OverlayY,
                 HotkeyToggleOverlay = dto.HotkeyToggleOverlay ?? "Ctrl+Alt+T",
                 HotkeyPauseCapture = dto.HotkeyPauseCapture ?? "Ctrl+Alt+P",
                 HotkeyOpenSettings = dto.HotkeyOpenSettings ?? "Ctrl+Alt+S",
@@ -79,6 +81,8 @@ public sealed class SettingsStore
             OverlayTextColor = s.OverlayTextColor,
             OverlayBgColor = s.OverlayBgColor,
             OverlayOpacity = s.OverlayOpacity,
+            OverlayX = s.OverlayX,
+            OverlayY = s.OverlayY,
             HotkeyToggleOverlay = s.HotkeyToggleOverlay,
             HotkeyPauseCapture = s.HotkeyPauseCapture,
             HotkeyOpenSettings = s.HotkeyOpenSettings,
@@ -126,6 +130,8 @@ public sealed class SettingsStore
         public string? OverlayTextColor { get; set; }
         public string? OverlayBgColor { get; set; }
         public double OverlayOpacity { get; set; }
+        public double? OverlayX { get; set; }
+        public double? OverlayY { get; set; }
         public string? HotkeyToggleOverlay { get; set; }
         public string? HotkeyPauseCapture { get; set; }
         public string? HotkeyOpenSettings { get; set; }

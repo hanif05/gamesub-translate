@@ -105,6 +105,18 @@ public sealed class GlobalHotkeyManager : IDisposable
         return Enum.TryParse(parts[^1], ignoreCase: true, out key) && key != Key.None;
     }
 
+    /// <summary>Format modifier + key back into "Ctrl+Alt+T" spec — inverse of TryParse.</summary>
+    public static string Format(ModifierKeys modifiers, Key key)
+    {
+        var parts = new List<string>();
+        if ((modifiers & ModifierKeys.Control) != 0) parts.Add("Ctrl");
+        if ((modifiers & ModifierKeys.Alt) != 0) parts.Add("Alt");
+        if ((modifiers & ModifierKeys.Shift) != 0) parts.Add("Shift");
+        if ((modifiers & ModifierKeys.Windows) != 0) parts.Add("Win");
+        parts.Add(key.ToString());
+        return string.Join("+", parts);
+    }
+
     private static class Native
     {
         [DllImport("user32.dll")]

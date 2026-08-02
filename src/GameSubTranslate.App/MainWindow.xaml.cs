@@ -252,4 +252,15 @@ public partial class MainWindow : Window
 
     /// <summary>Disposes the pipeline when the app exits without closing the window first.</summary>
     public void Dispose() => _pipeline?.Dispose();
+
+    /// <summary>T23: applies freshly-saved settings (pipeline rebuilds on next start to pick up new capture/lang config).</summary>
+    public void ReloadSettings(AppSettings fresh)
+    {
+        _settings.ApiKey = fresh.ApiKey;
+        _settings.BaseUrl = fresh.BaseUrl;
+        _settings.Model = fresh.Model;
+        _settings.SourceLang = fresh.SourceLang;
+        _settings.TargetLang = fresh.TargetLang;
+        _settings.CaptureIntervalMs = fresh.CaptureIntervalMs;
+    }
 }

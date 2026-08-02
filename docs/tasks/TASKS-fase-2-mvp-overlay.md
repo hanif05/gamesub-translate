@@ -265,7 +265,7 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: wiring di `App.OnStartup`.
 **Done when**: tekan `Ctrl+Alt+S` saat game aktif → settings window muncul di foreground. ESC atau close → hilang.
 **Depends on**: T18, T23 (minimal placeholder settings window).
-**Status**: ✅ DONE (sementara fokus ke MainWindow via ShowAndFocus — SettingsWindow placeholder sampai T23)
+**Status**: ✅ DONE (sejak T23: hotkey → SettingsWindow penuh, single-instance, reopen)
 
 #### T22. Hotkey: manual screenshot trigger
 **Deskripsi**: Bind `AppSettings.HotkeyManualCapture` (default `Ctrl+Alt+Space`) → trigger 1x capture pipeline (capture → ocr → translate → tampil di overlay) tanpa change detection. Method `Pipeline.CaptureOnce()` return `Task<string?>`.
@@ -291,6 +291,7 @@ Save → `SettingsStore.Save()`. Cancel → discard.
 **Output**: `src/App/Settings/SettingsWindow.xaml(.cs)`, `SettingsViewModel.cs`.
 **Done when**: buka settings, ganti API key, font, hotkey, language → restart app → semua setting persisten. Test Connection panggil API real dan return success kalau key valid.
 **Depends on**: T3, T5, T6, T18.
+**Status**: ✅ DONE (verified --selfcheck-t23: 6 tabs, hotkey Format round-trip, OverlayX/Y persisted, ApiKey DPAPI)
 
 #### T24. System tray icon
 **Deskripsi**: Pakai `Hardcodet.NotifyIcon.Wpf` (NuGet). `TaskbarIcon` di App, context menu:

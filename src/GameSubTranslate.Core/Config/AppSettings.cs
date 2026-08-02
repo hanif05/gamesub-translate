@@ -20,6 +20,9 @@ public sealed class AppSettings
     public string OverlayTextColor { get; set; } = "#FFFFFF";
     public string OverlayBgColor { get; set; } = "#CC000000";
     public double OverlayOpacity { get; set; } = 1.0;
+    // Optional saved overlay position (T23 Pick Position); null → center-bottom on first show.
+    public double? OverlayX { get; set; }
+    public double? OverlayY { get; set; }
     public string HotkeyToggleOverlay { get; set; } = "Ctrl+Alt+T";
     public string HotkeyPauseCapture { get; set; } = "Ctrl+Alt+P";
     public string HotkeyOpenSettings { get; set; } = "Ctrl+Alt+S";

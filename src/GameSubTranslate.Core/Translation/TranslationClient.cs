@@ -79,6 +79,16 @@ public class TranslationClient
         }
     }
 
+    /// <summary>
+    /// Single-attempt probe for the Settings "Test Connection" button — no retry, so a bad key
+    /// surfaces immediately instead of blocking ~7s on backoff. Throws on failure.
+    /// </summary>
+    public async Task<string?> TestConnectionAsync(CancellationToken ct = default)
+    {
+        if (!IsConfigured) return null;
+        return await TranslateOnceAsync("Hello", ct);
+    }
+
     private async Task<string?> TranslateOnceAsync(string text, CancellationToken ct)
     {
         var systemPrompt = $"Kamu adalah mesin penerjemah subtitle game. Terjemahkan teks berikut dari {_sourceLang} ke {_targetLang}. Jawab HANYA dengan hasil terjemahan, tanpa penjelasan tambahan, tanpa tanda kutip.";

@@ -1,6 +1,9 @@
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Interop;
 using GameSubTranslate.Config;
+using MouseEventHandler = System.Windows.Input.MouseEventHandler;
+using MouseButtonEventHandler = System.Windows.Input.MouseButtonEventHandler;
 
 namespace GameSubTranslate.App.Overlay;
 
@@ -25,11 +28,28 @@ public partial class OverlayWindow : Window
 
     private void ApplyStyle()
     {
-        Opacity = _settings.OverlayOpacity;
-        TextCard.Background = BrushFor(_settings.OverlayBgColor);
-        Subtitle.Foreground = BrushFor(_settings.OverlayTextColor);
-        Subtitle.FontFamily = new System.Windows.Media.FontFamily(_settings.OverlayFontFamily);
-        Subtitle.FontSize = _settings.OverlayFontSize;
+        ApplyStyle(_settings);
+    }
+
+    /// <summary>Re-applies style from a fresh settings object (T23: called after Settings save).</summary>
+    public void ApplySettings(AppSettings settings)
+    {
+        _settings = settings;
+        ApplyStyle(settings);
+        if (_shownOnce && settings.OverlayX is double x && settings.OverlayY is double y)
+        {
+            Left = x;
+            Top = y;
+        }
+    }
+
+    private void ApplyStyle(AppSettings settings)
+    {
+        Opacity = settings.OverlayOpacity;
+        TextCard.Background = BrushFor(settings.OverlayBgColor);
+        Subtitle.Foreground = BrushFor(settings.OverlayTextColor);
+        Subtitle.FontFamily = new System.Windows.Media.FontFamily(settings.OverlayFontFamily);
+        Subtitle.FontSize = settings.OverlayFontSize;
     }
 
     private static System.Windows.Media.Brush BrushFor(string hex)
@@ -47,16 +67,58 @@ public partial class OverlayWindow : Window
         }
     }
 
-    /// <summary>Shows the window, centering it near the bottom of the work area on first display.</summary>
+    /// <summary>Shows the window: saved position (T23) if any, else center-bottom on first display.</summary>
     public void ShowOverlay()
     {
         if (!_shownOnce)
         {
             _shownOnce = true;
-            Left = (SystemParameters.WorkArea.Width - Width) / 2 + SystemParameters.WorkArea.Left;
-            Top = SystemParameters.WorkArea.Bottom - Height - 40;
+            if (_settings.OverlayX is double x && _settings.OverlayY is double y)
+            {
+                Left = x;
+                Top = y;
+            }
+            else
+            {
+                Left = (SystemParameters.WorkArea.Width - Width) / 2 + SystemParameters.WorkArea.Left;
+                Top = SystemParameters.WorkArea.Bottom - Height - 40;
+            }
         }
         Show();
+    }
+
+    /// <summary>
+    /// T23 "Pick Position": makes the overlay draggable once so the user can place it, then saves
+    /// Left/Top to settings. Click-through is suspended during the drag and restored afterward.
+    /// </summary>
+    public void BeginReposition(Action<double, double>? onDone = null)
+    {
+        if (!IsVisible) ShowOverlay();
+        Activate();
+
+        var hwnd = new WindowInteropHelper(this).Handle;
+        int style = Win32.GetWindowLong(hwnd, Win32.GWL_EXSTYLE);
+        Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, style & ~Win32.WS_EX_TRANSPARENT);
+
+        // First mouse move primes DragMove (window follows the cursor natively); first left-up
+        // restores click-through and reports the final position.
+        MouseEventHandler? prime = null;
+        MouseButtonEventHandler? up = null;
+        up = (_, _) =>
+        {
+            MouseUp -= up;
+            if (prime is not null) MouseMove -= prime;
+            Win32.SetWindowLong(hwnd, Win32.GWL_EXSTYLE, style | Win32.WS_EX_TRANSPARENT);
+            onDone?.Invoke(Left, Top);
+        };
+        prime = (_, _) =>
+        {
+            MouseMove -= prime;
+            try { DragMove(); }
+            catch (InvalidOperationException) { } // drag never started (no button held)
+        };
+        MouseMove += prime;
+        MouseUp += up;
     }
 
     public void HideOverlay() => Hide();

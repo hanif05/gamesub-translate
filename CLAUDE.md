@@ -87,6 +87,7 @@ Kalau env var kosong, `TranslationClient` harus skip pemanggilan API (bukan cras
 - **Retry & timeout untuk `TranslationClient` belum diimplementasikan di Fase 1** (PRD section 6.5 minta retry dengan exponential backoff + timeout 10 detik). Fase 1 boleh skip ini untuk kecepatan prototyping, tapi WAJIB ditambahkan sebelum Fase 2/3 dianggap selesai.
 - **Windows.Graphics.Capture butuh Windows 10 1903+.** Kalau nanti testing di VM/environment lama, capture bisa gagal — pastikan versi Windows sesuai.
 - **Anti-cheat:** screen capture di project ini bersifat read-only via API resmi OS, TIDAK melakukan memory injection/hooking ke proses game. Jangan ubah pendekatan ini walau ada opsi "lebih akurat" yang butuh akses ke memory game — itu di luar scope dan berisiko.
+- **`UseWindowsForms=true` bikin type ambigu di WPF.** Global using `System.Windows.Forms` otomatis aktif → `TextBox`, `Button`, `ComboBox`, `Brush`, `MessageBox`, `Brushes`, `Cursors`, `KeyEventArgs` collide dengan WPF. Fix: tambah alias eksplisit di file yang kena (lihat `SettingsWindow.xaml.cs` header). Ini gotcha yang sama sudah ada di `App.xaml.cs` (fully-qualified `System.Windows.*`).
 
 ## Yang Harus Dibaca Sebelum Mulai Kerja
 

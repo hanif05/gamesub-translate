@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using GameSubTranslate.App.Overlay;
+using GameSubTranslate.App.Settings;
 using GameSubTranslate.Capture;
 using GameSubTranslate.Config;
 using GameSubTranslate.Hotkeys;
@@ -26,6 +27,7 @@ internal static class SelfChecks
         "--selfcheck-t18" => SelfCheckT18(),
         "--selfcheck-t19" => SelfCheckT19(),
         "--selfcheck-t22" => SelfCheckT22(),
+        "--selfcheck-t23" => SelfCheckT23(),
         _ => SelfCheckT14(),
     };
 
@@ -176,6 +178,57 @@ internal static class SelfChecks
         Console.WriteLine(fails == 0
             ? "PASS: overlay show/hide toggle keeps text state"
             : $"FAIL: {fails} toggle checks failed");
+        return fails == 0 ? 0 : 1;
+    }
+
+    private static int SelfCheckT23()
+    {
+        int fails = 0;
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        // Hotkey spec round-trips through TryParse/Format (the path Settings "Change" uses).
+        Check(GlobalHotkeyManager.TryParse("Ctrl+Alt+T", out var mods, out var key), "parse Ctrl+Alt+T");
+        var spec = GlobalHotkeyManager.Format(mods, key);
+        Check(spec == "Ctrl+Alt+T", $"Format(parse) != original: got {spec}");
+        Check(GlobalHotkeyManager.Format(ModifierKeys.Control | ModifierKeys.Shift, Key.F1) == "Ctrl+Shift+F1",
+            "Format Ctrl+Shift+F1 wrong");
+
+        // Settings round-trips including the T23 overlay position fields.
+        var dir = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t23");
+        Directory.CreateDirectory(dir);
+        var store = new SettingsStore(Path.Combine(dir, "settings.json"));
+        var s = new AppSettings
+        {
+            ApiKey = "sk-secret",
+            OverlayX = 123.5,
+            OverlayY = 456.75,
+            HotkeyToggleOverlay = "Ctrl+Shift+U",
+            OverlayOpacity = 0.6,
+        };
+        store.Save(s);
+        var back = store.Load();
+        Check(back.ApiKey == "sk-secret", "ApiKey DPAPI round-trip failed");
+        Check(back.OverlayX == 123.5 && back.OverlayY == 456.75, "OverlayX/Y not persisted");
+        Check(back.HotkeyToggleOverlay == "Ctrl+Shift+U", "hotkey not persisted");
+        Check(back.OverlayOpacity == 0.6, "opacity not persisted");
+        var raw = File.ReadAllText(store.FilePath);
+        Check(!raw.Contains("sk-secret"), "ApiKey stored in plaintext");
+        File.Delete(store.FilePath);
+
+        // Smoke-test the settings window itself: instantiates all tabs + palette without throwing.
+        var settings = new SettingsWindow(overlay: null);
+        Check(settings.Tabs.Items.Count == 6, $"expected 6 tabs, got {settings.Tabs.Items.Count}");
+        settings.Show();
+        settings.Close();
+
+        Console.WriteLine(fails == 0
+            ? "PASS: SettingsWindow tabs + hotkey format + settings round-trip"
+            : $"FAIL: {fails} settings checks failed");
         return fails == 0 ? 0 : 1;
     }
 
