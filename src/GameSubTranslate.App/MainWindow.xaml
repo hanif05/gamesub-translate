@@ -22,6 +22,15 @@
             <ComboBox x:Name="RegionCombo" MinWidth="220" DisplayMemberPath="Display" SelectionChanged="RegionCombo_SelectionChanged"/>
         </StackPanel>
 
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,0,0,8">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="StartBtn" Content="Start" Width="80" Margin="0,0,4,0" Click="Start_Click"/>
+                <Button x:Name="PauseBtn" Content="Pause" Width="80" Margin="0,0,4,0" Click="Pause_Click" IsEnabled="False"/>
+                <Button x:Name="StopBtn" Content="Stop" Width="80" Click="Stop_Click" IsEnabled="False"/>
+            </StackPanel>
+            <TextBlock x:Name="StatusText" Foreground="Gray" VerticalAlignment="Center" Text="Idle"/>
+        </DockPanel>
+
         <ListBox x:Name="ProfileList" SelectionMode="Single" DisplayMemberPath="Name" SelectionChanged="ProfileList_SelectionChanged"/>
     </DockPanel>
 </Window>

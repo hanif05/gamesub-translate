@@ -13,7 +13,7 @@ public sealed class TranslationException : Exception
     public TranslationException(string message, Exception inner) : base(message, inner) { }
 }
 
-public sealed class TranslationClient
+public class TranslationClient
 {
     // Initial call + 3 retries with backoff 1s -> 2s -> 4s (total ~7s worst case).
     private const int MaxAttempts = 4;
@@ -41,7 +41,7 @@ public sealed class TranslationClient
 
     public string TargetLang => _targetLang;
 
-    public async Task<string?> TranslateAsync(string text, CancellationToken ct = default)
+    public virtual async Task<string?> TranslateAsync(string text, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(text)) return text;
         if (!IsConfigured) return null;

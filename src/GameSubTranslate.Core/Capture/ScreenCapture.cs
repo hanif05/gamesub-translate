@@ -22,7 +22,7 @@ namespace GameSubTranslate.Capture;
 /// (explicitly allowed by the T10 spec). If a future task needs higher throughput, switch to
 /// SaveAsync on the GPU bitmap — the crop math stays identical.
 /// </summary>
-public sealed class ScreenCapture : IDisposable
+public sealed class ScreenCapture : IScreenCapture
 {
     private readonly Direct3D11CaptureFramePool _framePool;
     private readonly GraphicsCaptureSession _session;

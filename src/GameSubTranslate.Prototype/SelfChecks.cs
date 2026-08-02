@@ -5,7 +5,10 @@ using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using GameSubTranslate.Cache;
+using GameSubTranslate.Capture;
 using GameSubTranslate.Config;
+using GameSubTranslate.Ocr;
+using GameSubTranslate.Pipeline;
 using GameSubTranslate.Profiles;
 using GameSubTranslate.Storage;
 using GameSubTranslate.Translation;
@@ -28,6 +31,8 @@ internal static class SelfChecks
         "--selfcheck-t11" => SelfCheckT11(),
         "--selfcheck-t12" => SelfCheckT12(),
         "--selfcheck-t13" => SelfCheckT13(),
+        "--selfcheck-t16" => SelfCheckT16(),
+        "--selfcheck-t17" => SelfCheckT17(),
         _ => SelfCheckT3(),
     };
 
@@ -466,6 +471,155 @@ internal static class SelfChecks
 
         Console.WriteLine("PASS: TranslationCache get/put/upsert/hash-distinct");
         return 0;
+    }
+
+    // ---------- T16/T17: TranslatePipeline service (start/stop + pause/resume) ----------
+
+    /// <summary>Scripted capture source: re-evaluates a frame factory on every call so tests can flip content live.</summary>
+    private sealed class FakeCapture : IScreenCapture
+    {
+        private readonly Func<string> _frame;
+        public int FrameCalls;
+        public FakeCapture(Func<string> frame) => _frame = frame;
+
+        public byte[] CaptureRegion(int x, int y, int w, int h)
+        {
+            FrameCalls++;
+            return MakeFrame(_frame());
+        }
+
+        /// <summary>Current frame content — lets a fake OCR "read" what the capture sees.</summary>
+        public string CurrentText() => _frame();
+
+        public void Dispose() { }
+    }
+
+    /// <summary>OCR that returns the frame's current content (via the shared capture). Counts calls.</summary>
+    private sealed class FakeOcr : IOcrEngine
+    {
+        private readonly FakeCapture _cap;
+        public int Calls;
+        public FakeOcr(FakeCapture cap) => _cap = cap;
+        public string Recognize(byte[] pngBytes) { Calls++; return _cap.CurrentText(); }
+    }
+
+    /// <summary>Passthrough translator with an attempt counter, so pipeline-translate calls are observable.</summary>
+    private sealed class FakeTranslator : TranslationClient
+    {
+        public int Attempts;
+        public string? Result = "hasil terjemahan";
+        public FakeTranslator() : base("k", "https://api.example.com", "m", "auto", "id") { }
+
+        public override async Task<string?> TranslateAsync(string text, CancellationToken ct)
+        {
+            await Task.Yield();
+            Attempts++;
+            return Result;
+        }
+    }
+
+    private static int SelfCheckT16()
+    {
+        int fails = 0;
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        // Frames: static until demand > 0 flips to changing subtitle.
+        int demand = 0;
+        string NextFrame() => demand > 0 ? "subtitle berubah" : "teks diam";
+        var cap = new FakeCapture(NextFrame);
+
+        var ocr = new FakeOcr(cap);
+        var trans = new FakeTranslator();
+        var results = new List<string>();
+        var states = new List<string>();
+        using var pipe = new TranslatePipeline(cap, ocr, trans, cache: null,
+            x: 0, y: 0, w: 100, h: 30, intervalMs: 30, t => results.Add(t));
+        pipe.StatusChanged += s => states.Add(s);
+
+        pipe.Start();
+        Thread.Sleep(700);
+        int capBefore = cap.FrameCalls;
+        int ocrCallsBefore = ocr.Calls;
+        int transCallsBefore = trans.Attempts;
+        int resultBefore = results.Count;
+        Check(pipe.IsRunning, "pipeline not running after Start");
+        Check(capBefore > 3, $"loop not ticking (capture calls={capBefore})");
+        Check(ocrCallsBefore == 1, $"static frame re-OCR'd ({ocrCallsBefore} OCR calls)");
+
+        // Subtitle changes → loop detects it → OCR + translate → callback fires.
+        demand = 1;
+        int deadline = Environment.TickCount + 5000;
+        while (results.Count == resultBefore && Environment.TickCount < deadline) Thread.Sleep(25);
+        Check(results.Count > resultBefore, $"onTranslated callback never fired for changed text (count={results.Count})");
+        Check(trans.Attempts > transCallsBefore, "translate never called");
+        Check(ocr.Calls > ocrCallsBefore, "OCR never called");
+        Check(cap.FrameCalls > capBefore, "capture stopped during change");
+
+        // Stop → loop halts, no more calls, no exception.
+        pipe.Stop();
+        Check(!pipe.IsRunning, "pipeline still running after Stop");
+        int ocrAfterStop = ocr.Calls;
+        int transAfterStop = trans.Attempts;
+        Thread.Sleep(300);
+        Check(ocr.Calls == ocrAfterStop && trans.Attempts == transAfterStop, "loop kept running after Stop");
+
+        // Restart works (Idempotent Start).
+        pipe.Start();
+        Thread.Sleep(200);
+        Check(pipe.IsRunning, "pipeline did not restart");
+        pipe.Stop();
+
+        Console.WriteLine(fails == 0
+            ? "PASS: TranslatePipeline start/stop/loop/callback"
+            : $"FAIL: {fails} T16 checks failed");
+        return fails == 0 ? 0 : 1;
+    }
+
+    private static int SelfCheckT17()
+    {
+        int fails = 0;
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        var cap = new FakeCapture(() => "subtitle satu");
+        var ocr = new FakeOcr(cap);
+        var trans = new FakeTranslator();
+        var results = new List<string>();
+        using var pipe = new TranslatePipeline(cap, ocr, trans, cache: null,
+            x: 0, y: 0, w: 100, h: 30, intervalMs: 25, t => results.Add(t));
+
+        pipe.Start();
+        // Pause immediately — the first frame may slip through before pause lands.
+        pipe.Pause();
+        Thread.Sleep(600);
+        int transBefore = trans.Attempts;
+        int capBefore = cap.FrameCalls;
+
+        Thread.Sleep(600);
+        Check(pipe.IsPaused, "not paused");
+        Check(trans.Attempts == transBefore, $"translate called while paused ({trans.Attempts - transBefore} extra)");
+        Check(cap.FrameCalls > capBefore, $"capture loop stopped while paused (frames={cap.FrameCalls - capBefore})");
+
+        // Resume → the (already-translated) frame yields no new API call.
+        pipe.Resume();
+        Thread.Sleep(600);
+        Check(!pipe.IsPaused, "not resumed");
+        Check(trans.Attempts == transBefore, $"translate called after resume with no new frame (extra={trans.Attempts - transBefore})");
+        pipe.Stop();
+
+        Console.WriteLine(fails == 0
+            ? "PASS: TranslatePipeline pause keeps capture alive + skips translate; resume continues"
+            : $"FAIL: {fails} T17 checks failed");
+        return fails == 0 ? 0 : 1;
     }
 
     private static int SelfCheckT9()

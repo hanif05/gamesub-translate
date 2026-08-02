@@ -221,12 +221,14 @@ Update `.sln`, tambah `<ProjectReference>` dari App → Core, dan dari Prototype
 **Output**: update `src/Core/Pipeline/TranslatePipeline.cs`.
 **Done when**: dari `MainWindow` klik "Start Pipeline" → loop berjalan di background, callback dipanggil tiap ada teks baru. Klik "Stop" → loop cancel bersih tanpa exception.
 **Depends on**: T10, T11, T12, T13.
+**Status**: ✅ DONE (commit a2d6ea4, verified --selfcheck-t16)
 
 #### T17. Pipeline pause/resume flag
 **Deskripsi**: Tambah `Pause()` / `Resume()` method di `TranslatePipeline`. Saat paused, loop tetap jalan tapi skip OCR+translate (capture tetap jalan supaya saat resume, frame terbaru langsung diproses — tidak ada backlog). Bind ke `AppSettings.HotkeyPauseCapture` di T20.
 **Output**: update `TranslatePipeline.cs`.
 **Done when**: start pipeline, panggil `Pause()` dari test code → API call berhenti muncul di log. Panggil `Resume()` → API call jalan lagi. Capture loop tetap aktif selama paused (verify dengan log internal).
 **Depends on**: T16.
+**Status**: ✅ DONE (verified --selfcheck-t17)
 
 ---
 
