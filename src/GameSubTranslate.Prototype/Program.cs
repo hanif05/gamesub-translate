@@ -1,22 +1,21 @@
-using System.Drawing;
-using System.Drawing.Imaging;
-using GameSubTranslate.Prototype.Capture;
-using GameSubTranslate.Prototype.Pipeline;
+using GameSubTranslate.Prototype.Translation;
 
-// 1) First capture has no prior -> changed
-byte[] a = ScreenCapture.CaptureRegion(0, 0, 200, 100);
-byte[] b = ScreenCapture.CaptureRegion(0, 0, 200, 100);
+// Test: skip call when no api key (empty baseUrl means unconfigured)
+var client = new TranslationClient(apiKey: "", baseUrl: "", model: "", sourceLang: "auto", targetLang: "id");
+Console.WriteLine($"IsConfigured: {client.IsConfigured} (expect False)");
 
-Console.WriteLine($"byte lengths: a={a.Length} b={b.Length}");
-Console.WriteLine($"byte-equal: {a.AsSpan().SequenceEqual(b)}");
-Console.WriteLine($"IsChanged(a, null): {ChangeDetector.IsChanged(a, null)} (expect True)");
-Console.WriteLine($"IsChanged(b, a) [identical]: {ChangeDetector.IsChanged(b, a)} (expect False)");
+var skipResult = await client.TranslateAsync("Hello world");
+Console.WriteLine($"skip result: '{skipResult ?? "<null>"}' (expect <null>)");
 
-// Make a different capture by drawing into a region that includes the time-tick of a clock
-byte[] c = ScreenCapture.CaptureRegion(100, 100, 200, 100);
-Console.WriteLine($"IsChanged(c, b) [different region]: {ChangeDetector.IsChanged(c, b)} (expect True)");
-
-// Stress: 100x identical comparisons stay consistent
-int flips = 0;
-for (int i = 0; i < 100; i++) if (ChangeDetector.IsChanged(b, a)) flips++;
-Console.WriteLine($"100x stress flips: {flips} (expect 0)");
+// Test: with dummy key hits endpoint (we expect HTTP failure, but proves request is built)
+var active = new TranslationClient(apiKey: "sk-test", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", sourceLang: "en", targetLang: "id");
+Console.WriteLine($"active IsConfigured: {active.IsConfigured} (expect True)");
+try
+{
+    var r = await active.TranslateAsync("Hello");
+    Console.WriteLine($"translate result: '{r}'");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"HTTP error (expected with fake key): {ex.GetType().Name}: {ex.Message[..Math.Min(80, ex.Message.Length)]}");
+}
