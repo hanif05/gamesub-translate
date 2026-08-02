@@ -36,6 +36,7 @@ public partial class App : System.Windows.Application
 
         _settings = new SettingsStore().Load();
         _overlay = new OverlayWindow(_settings);
+        _overlay.ShowOverlay(); // T14: overlay is visible (transparent) from launch; hotkey hides it.
         _main = new MainWindow(new Database(), null, _overlay);
 
         _hotkeys = new GlobalHotkeyManager();
@@ -63,6 +64,7 @@ public partial class App : System.Windows.Application
     private void InitTray()
     {
         _tray = (TaskbarIcon)Resources["TrayIcon"];
+        _tray.Icon = BuildTrayIcon();
         _tray.Visibility = System.Windows.Visibility.Visible;
 
         var menu = new System.Windows.Controls.ContextMenu();
@@ -101,6 +103,23 @@ public partial class App : System.Windows.Application
         _main.Show();
         _main.Activate();
         _main.WindowState = System.Windows.WindowState.Normal;
+    }
+
+    /// <summary>T24: tray icon with no .ico asset on disk — draw "GS" text onto a 32x32 bitmap at runtime.</summary>
+    private static System.Drawing.Icon BuildTrayIcon()
+    {
+        using var bmp = new System.Drawing.Bitmap(32, 32);
+        using (var g = System.Drawing.Graphics.FromImage(bmp))
+        {
+            g.Clear(System.Drawing.Color.FromArgb(32, 90, 200));
+            using var font = new System.Drawing.Font("Arial", 16f, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Pixel);
+            using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.White);
+            var size = g.MeasureString("GS", font);
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+            g.DrawString("GS", font, brush, (bmp.Width - size.Width) / 2, (bmp.Height - size.Height) / 2);
+        }
+        // FromHandle wraps the HICON; the app keeps the icon for its whole lifetime (no destroy needed).
+        return System.Drawing.Icon.FromHandle(bmp.GetHicon());
     }
 
     /// <summary>T24: full shutdown — release hotkeys + pipeline, clear tray icon, close overlay.</summary>
@@ -147,7 +166,7 @@ public partial class App : System.Windows.Application
             _settingsWindow = new SettingsWindow(_overlay);
             _settingsWindow.Closed += (_, _) =>
             {
-                if (_settingsWindow!.DialogResult != false) ReloadSettings();
+                if (_settingsWindow!.Saved) ReloadSettings();
                 _settingsWindow = null;
             };
         }

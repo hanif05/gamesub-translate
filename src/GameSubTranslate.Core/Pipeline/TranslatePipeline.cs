@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using GameSubTranslate.Cache;
 using GameSubTranslate.Capture;
 using GameSubTranslate.Config;
@@ -208,8 +209,12 @@ public sealed class TranslatePipeline : IDisposable
             if (_translator is null)
                 return text; // passthrough when translation isn't configured
 
+            // T26 scenario 8: end-to-end latency from subtitle change to translated output.
+            var sw = Stopwatch.StartNew();
             string? translated = _cache?.Get(text, _translator.TargetLang)
                 ?? await _translator.TranslateAsync(text, ct);
+            sw.Stop();
+            Console.WriteLine($"[latency] {sw.Elapsed.TotalMilliseconds:F0}ms \"{text}\" -> \"{translated}\"");
             if (translated is not null && _cache is not null)
                 _cache.Put(text, translated, _translator.TargetLang);
             return translated;

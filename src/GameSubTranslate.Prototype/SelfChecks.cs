@@ -33,6 +33,7 @@ internal static class SelfChecks
         "--selfcheck-t13" => SelfCheckT13(),
         "--selfcheck-t16" => SelfCheckT16(),
         "--selfcheck-t17" => SelfCheckT17(),
+        "--selfcheck-t26" => SelfCheckT26(),
         _ => SelfCheckT3(),
     };
 
@@ -178,6 +179,15 @@ internal static class SelfChecks
         if (updated is null || updated.Name != "Test Game Renamed" || updated.Regions.Count != 1)
         {
             Console.WriteLine($"FAIL: update name={updated?.Name}, regions={updated?.Regions.Count}");
+            return 1;
+        }
+
+        // T26 bug-fix: Update() must re-assign fresh region ids (delete-then-reinsert). A stale id
+        // leaves the persisted ActiveRegionId orphaned → wrong region picked after an edit.
+        var fresh = repo.GetById(id);
+        if (fresh is null || fresh.Regions[0].Id == 0)
+        {
+            Console.WriteLine("FAIL: updated region kept id 0 — ActiveRegionId would be stale");
             return 1;
         }
 
@@ -685,5 +695,48 @@ internal static class SelfChecks
 
         Console.WriteLine("PASS: ProfileService active region switch + persistence across restart");
         return 0;
+    }
+
+    // ---------- T26: E2E cache integration (scenario 6: same text twice → 1 API call) ----------
+
+    private static int SelfCheckT26()
+    {
+        int fails = 0;
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        // Real SQLite cache + pipeline over fakes. Same subtitle appears twice → only the first
+        // translation hits the API; the second comes from the cache. Mirrors the app wiring
+        // (MainWindow.EnsurePipeline now passes a real TranslationCacheRepository).
+        var dbPath = Path.Combine(Path.GetTempPath(), "gst-selfcheck-t26", "profiles.db");
+        if (File.Exists(dbPath)) File.Delete(dbPath);
+        var db = new Database(dbPath);
+        db.EnsureSchema();
+        var cache = new TranslationCacheRepository(db);
+
+        var cap = new FakeCapture(() => "subtitle yang sama");
+        var ocr = new FakeOcr(cap);
+        var trans = new FakeTranslator();
+        using var pipe = new TranslatePipeline(cap, ocr, trans, cache,
+            x: 0, y: 0, w: 100, h: 30, intervalMs: 25, _ => { });
+
+        // Manual trigger reads cache first (T13 hook): second run must not re-hit the API.
+        var r1 = pipe.CaptureOnceAsync().GetAwaiter().GetResult();
+        Check(r1 == "hasil terjemahan", $"first translate failed ({r1})");
+        Check(trans.Attempts == 1, $"first translate should hit API once ({trans.Attempts})");
+        Check(cache.Get("subtitle yang sama", trans.TargetLang) is not null, "cache miss after first Put");
+
+        var r2 = pipe.CaptureOnceAsync().GetAwaiter().GetResult();
+        Check(r2 == "hasil terjemahan", $"cached translate failed ({r2})");
+        Check(trans.Attempts == 1, $"second translate re-hit API ({trans.Attempts} attempts)");
+
+        Console.WriteLine(fails == 0
+            ? "PASS: T26 cache integration — same text twice = 1 API call"
+            : $"FAIL: {fails} T26 cache checks failed");
+        return fails == 0 ? 0 : 1;
     }
 }

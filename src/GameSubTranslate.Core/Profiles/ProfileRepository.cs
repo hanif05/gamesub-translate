@@ -80,13 +80,17 @@ public sealed class ProfileRepository
                 WHERE Id=@Id", p, tx);
 
             // Regions: delete-then-reinsert keeps the model authoritative and avoids diff logic.
+            // Re-set r.Id from the new rowid so the in-memory model stays in sync with the DB —
+            // otherwise the persisted ActiveRegionId (settings) points at a deleted row and region
+            // selection silently falls back to the wrong region after an edit (T26 bug).
             conn.Execute("DELETE FROM CaptureRegion WHERE ProfileId=@ProfileId", new { ProfileId = p.Id }, tx);
             foreach (var r in p.Regions)
             {
                 r.ProfileId = p.Id;
-                conn.Execute(@"
+                r.Id = conn.ExecuteScalar<int>(@"
                     INSERT INTO CaptureRegion (ProfileId, RegionName, X, Y, Width, Height, MonitorIndex, IsActiveDefault, SortOrder)
-                    VALUES (@ProfileId, @RegionName, @X, @Y, @Width, @Height, @MonitorIndex, @IsActiveDefault, @SortOrder)", r, tx);
+                    VALUES (@ProfileId, @RegionName, @X, @Y, @Width, @Height, @MonitorIndex, @IsActiveDefault, @SortOrder);
+                    SELECT last_insert_rowid();", r, tx);
             }
             tx.Commit();
         }

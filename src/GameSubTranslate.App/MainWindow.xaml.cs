@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using GameSubTranslate.App.Profiles;
+using GameSubTranslate.Cache;
 using GameSubTranslate.Config;
 using GameSubTranslate.Ocr;
 using GameSubTranslate.Pipeline;
@@ -91,7 +92,29 @@ public partial class MainWindow : Window
     {
         if (_updating) return;
         if (RegionCombo.SelectedItem is CaptureRegion r)
+        {
             _service.SetActiveRegion(r.Id);
+            // T26 scenario 5: a running pipeline was built against the old region's coords. Drop it
+            // so the next Start rebuilds over the newly-selected region (region switch = new coords).
+            if (_pipeline is not null && _pipeline.IsRunning)
+            {
+                ResetPipeline("Region switched — click Start to resume over the new region.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Stops + disposes a running pipeline so the next Start rebuilds it with fresh region/config.
+    /// Called when the capture geometry changes under a live pipeline (region switch, profile edit).
+    /// </summary>
+    private void ResetPipeline(string? status = null)
+    {
+        if (_pipeline is null) return;
+        _pipeline.Stop();
+        _pipeline.Dispose();
+        _pipeline = null;
+        SetButtons(running: false, paused: false);
+        if (status is not null) SetStatus(status);
     }
 
     private GameProfile? Selected => ProfileList.SelectedItem as GameProfile;
@@ -140,6 +163,8 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog() == true)
         {
             _repo.Update(dlg.Result);
+            // T26: editing regions changes capture geometry — the running pipeline is stale.
+            ResetPipeline("Profile edited — click Start to resume with the new region.");
             Refresh();
         }
     }
@@ -166,6 +191,7 @@ public partial class MainWindow : Window
             $"Delete profile \"{sel.Name}\"? This removes all its regions.",
             "Confirm", MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (ok != MessageBoxResult.OK) return;
+        ResetPipeline();
         _repo.Delete(sel.Id);
         if (_service.ActiveProfileId == sel.Id)
             _service.ClearActiveProfile();
@@ -224,11 +250,21 @@ public partial class MainWindow : Window
         var ocr = new TesseractOcrEngine();
         _pipeline = TranslatePipeline.ForEnvironment(
             region.X, region.Y, region.Width, region.Height, _settings.CaptureIntervalMs,
-            ocr, cfg, cache: null, t => Dispatcher.Invoke(() =>
+            ocr, cfg, cache: new TranslationCacheRepository(_db), t => Dispatcher.Invoke(() =>
             {
                 SetStatus($"dst: {t}");
                 _overlay?.ShowText(t); // T22: translated text lands on the overlay.
             }));
+
+        // T26 scenario 10: surface pipeline/translation errors on the overlay too, so a dead API
+        // key is visible over the game instead of the overlay silently staying empty.
+        _pipeline.StatusChanged += s => Dispatcher.Invoke(() =>
+        {
+            if (s.StartsWith("[") && s.EndsWith("]")) return; // started/paused/resumed — not errors
+            SetStatus(s);
+            if (s.StartsWith("[translate-error]") || s.StartsWith("[tick-error]"))
+                _overlay?.ShowText($"⚠ {s}");
+        });
         return _pipeline;
     }
 
@@ -288,5 +324,8 @@ public partial class MainWindow : Window
         _settings.SourceLang = fresh.SourceLang;
         _settings.TargetLang = fresh.TargetLang;
         _settings.CaptureIntervalMs = fresh.CaptureIntervalMs;
+        // New API key/model → the running TranslationClient holds the old key. Drop the pipeline so
+        // the next Start builds one with the fresh config (T26: settings change = rebuild).
+        ResetPipeline("Settings changed — click Start to resume with the new config.");
     }
 }

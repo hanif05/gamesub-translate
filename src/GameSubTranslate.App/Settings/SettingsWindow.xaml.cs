@@ -35,6 +35,9 @@ public partial class SettingsWindow : Window
     private string _hotkeySetting = "";
     private TextBox? _colorTarget;
 
+    /// <summary>True once the user saved. Read after Close to decide whether settings need reloading.</summary>
+    public bool Saved { get; private set; }
+
     private static readonly string[] Palette =
     {
         "#FFFFFF", "#CCCCCC", "#808080", "#000000",
@@ -330,13 +333,14 @@ public partial class SettingsWindow : Window
         s.OverlayOpacity = OpacitySlider.Value;
 
         new SettingsStore().Save(s);
-        DialogResult = true;
+        Saved = true;
         Close();
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
-        DialogResult = false;
+        // Opened via Show() (non-modal) — never set DialogResult here: WPF throws on a
+        // non-dialog window and kills the app. Cancel = discard + close.
         Close();
     }
 

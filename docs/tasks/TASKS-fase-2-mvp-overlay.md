@@ -334,6 +334,7 @@ Catat hasil di section "Hasil Verifikasi" di bawah file ini.
 **Output**: section "Hasil Verifikasi" + screenshot/log terlampir.
 **Done when**: semua 10 skenario di atas lulus + latency tercatat.
 **Depends on**: T1-T25.
+**Status**: ✅ DONE (verified 2026-08-02, lihat "Hasil Verifikasi" di bawah; 6 bug fix selama verifikasi)
 
 ---
 
@@ -376,7 +377,35 @@ Sesuai estimasi roadmap PRD 2-3 minggu, on track kalau tidak ada blocker tak ter
 
 ## Hasil Verifikasi (diisi saat T26 selesai)
 
-_(kosong — akan diisi di akhir fase)_
+**T26 — End-to-end manual verification** (2026-08-02, Windows 11, OpenRouter `inclusionai/ling-3.0-flash:free`, capture region di monitor 1, subtitle dari screenshot game).
+
+| # | Skenario | Hasil |
+|---|---|---|
+| 1 | API key valid → Test Connection | ✅ PASS — tampil "halo" |
+| 2 | New Profile + drag region di atas subtitle | ✅ PASS — region tersimpan, dipakai pipeline |
+| 3 | Overlay muncul dengan teks terjemahan | ✅ PASS — terjemahan tampil real-time |
+| 4 | Hotkeys: toggle overlay / pause / settings / manual capture | ✅ PASS — 1-3 berfungsi, `Ctrl+Alt+Space` manual capture 1x jalan (saat paused) |
+| 5 | Multi-region: tambah region kedua, switch via dropdown | ✅ PASS — setelah fix pipeline rebuild saat region switch |
+| 6 | Cache: teks sama 2x → 1 API call | ✅ PASS — log: "Enneleyn: Greetings..." API 1x (1765ms), hit berikutnya 0-1ms; `--selfcheck-t26` PASS |
+| 7 | Auto-load: foreground exe match profile → auto switch | ✅ PASS — pindah ke screenshot game → auto-load + translate dalam <3s |
+| 8 | Latency subtitle berubah → overlay | ✅ PASS — API call **~1.5–4.9 detik** (dominan waktu LLM), cache hit 0-1ms |
+| 9 | Change detection: subtitle diam 30 detik → no API call | ✅ PASS — status "dst:" cuma 1x, tidak spam; pindah gambar → "dst:" baru |
+| 10 | API key invalid → overlay tampil error, app tidak crash | ✅ PASS — `⚠ [translate-error]` di overlay, app tetap hidup |
+
+**Bug yang ditemukan & difix selama T26:**
+- **Tray icon tidak muncul** — `TaskbarIcon` tanpa `IconSource`, tidak ada file `.ico`. Fix: generate icon "GS" runtime di `App.InitTray()`.
+- **Overlay tidak auto-show** — dibuat tapi tidak di-show di `OnStartup`. Fix: `_overlay.ShowOverlay()` saat launch.
+- **Cancel/Save settings crash app** — `SettingsWindow` dibuka via `Show()` (non-modal) tapi tombol set `DialogResult` → WPF throw `InvalidOperationException`. Fix: non-modal pakai flag `Saved` property, bukan `DialogResult`.
+- **Region baru dapat koordinat region lama** — (1) `ProfileRepository.Update` delete-then-reinsert tidak re-set `r.Id` → `ActiveRegionId` stale; (2) edit profile tidak reset pipeline yang sudah jalan (masih pakai coords region lama). Fix: re-set `r.Id` di `Update()`, panggil `ResetPipeline()` saat region switch + edit + delete profile.
+- **Settings change tidak rebuild pipeline** — ganti API key/model lewat settings, pipeline lama masih pakai key lama. Fix: `ReloadSettings` → `ResetPipeline()`.
+- **"GraphicsCapture returned no frame"** — throw saat frame null → spam status tiap interval. Fix: return `Array.Empty<byte>()` (transient: screen off, monitor switch, frame-pool race).
+
+**Catatan:**
+- `--selfcheck-t26` ditambahkan (cache integration real SQLite, Prototype) — PASS.
+- Latency diukur via `[latency]` log di `TranslatePipeline.TranslateAsync` (tidak masuk commit? — sudah masuk sebagai instrumentasi kecil).
+- Provider `:free` model bisa rate-limit → API call gagal beruntun; bukan bug app (retry + overlay error sudah benar).
+
+**Kesimpulan:** Semua 10 skenario lulus. Fase 2 MVP overlay siap.
 
 ---
 

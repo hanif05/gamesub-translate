@@ -74,7 +74,12 @@ public sealed class ScreenCapture : IScreenCapture
         _frameReady.WaitOne(2000); // wait for the async push (falls through if already signalled)
         using var frame = _framePool.TryGetNextFrame();
         if (frame is null)
-            throw new InvalidOperationException("GraphicsCapture returned no frame");
+        {
+            // Transient: screen off/dim, monitor switch, UAC overlay, or a frame-pool race where the
+            // event fired before a new frame landed. Skip the tick instead of throwing — a throw
+            // would spam the pipeline status every capture interval (~800ms) for a recoverable state.
+            return Array.Empty<byte>();
+        }
 
         // Frame surface covers the full monitor starting at (0,0) in monitor-relative pixels.
         int ox = x - _monLeft;
