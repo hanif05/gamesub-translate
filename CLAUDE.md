@@ -6,7 +6,7 @@ Dokumen ini adalah aturan main untuk Claude Code setiap kali kerja di project in
 
 Personal tool untuk auto-translate subtitle game PC (fokus RPG/story-heavy game, termasuk game modern AAA seperti The Last of Us). User bisa menentukan custom capture area (karena posisi subtitle beda-beda tiap game), lalu sistem otomatis OCR + translate teks tersebut dan tampilkan sebagai overlay di atas game.
 
-Dibangun untuk kebutuhan personal (bukan produk komersial). Lihat `docs/PRD.md` untuk requirement lengkap.
+Dibangun untuk kebutuhan personal (bukan produk komersial). Lihat `PRD-Auto-Translate-Subtitle-Game.md` untuk requirement lengkap.
 
 ## Tech Stack (Keputusan Final — Windows-only)
 
