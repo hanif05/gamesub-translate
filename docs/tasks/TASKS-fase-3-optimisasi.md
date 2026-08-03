@@ -48,6 +48,7 @@ Fase 3 **memperdalam & mengisi celah**, bukan replace. TIDAK refactor besar — 
 ### FASE 3.A — Testing Foundation
 
 #### T28. xUnit test project + infrastructure
+**Status**: ✅ done (commit `ca9c9ec`).
 **Deskripsi**: Tambah project `tests/GameSubTranslate.Core.Tests/GameSubTranslate.Core.Tests.csproj` (xUnit + Moq). Setup:
 - Reference ke `GameSubTranslate.Core` saja (App butuh WPF, di-test terpisah di fase 4).
 - Folder `Helpers/` dengan `MockHttpMessageHandler` (delegate `Func<HttpRequestMessage, HttpResponseMessage>` untuk stub HTTP response, plus counter untuk hit count).
@@ -56,10 +57,11 @@ Fase 3 **memperdalam & mengisi celah**, bukan replace. TIDAK refactor besar — 
 - Tambah ke `GameSubTranslate.sln`.
 
 **Output**: project `tests/GameSubTranslate.Core.Tests/` dengan sample 1 test kosong yang pass.
-**Done when**: `dotnet test` dari root jalan, exit 0, 1 test pass.
+**Done when**: `dotnet test` dari root jalan, exit 0, 1 test pass. ✅
 **Depends on**: —
 
 #### T29. Tests: ChangeDetector
+**Status**: ✅ done (commit `8667196`).
 **Deskripsi**: Test `ChangeDetector` (Core/Pipeline/) pakai synthetic PNG 8x8 (built in-code, tidak perlu file fixture):
 - Identik 100x → `false`.
 - 1 pixel beda (noise) di threshold 5 → `false`.
@@ -68,11 +70,12 @@ Fase 3 **memperdalam & mengisi celah**, bukan replace. TIDAK refactor besar — 
 - Hamming distance calculation benar untuk synthetic 64-bit hash.
 - Edge: empty PNG / 0x0 → throw atau return true (documented).
 
-**Output**: `tests/.../Pipeline/ChangeDetectorTests.cs`, min 6 test cases.
-**Done when**: `dotnet test --filter ChangeDetector` all green.
+**Output**: `tests/.../Pipeline/ChangeDetectorTests.cs`, min 6 test cases. — 12 cases implemented.
+**Done when**: `dotnet test --filter ChangeDetector` all green. ✅
 **Depends on**: T28.
 
 #### T30. Tests: TranslationClient (retry + timeout + error categorization)
+**Status**: ✅ done (commit `2092b1c`).
 **Deskripsi**: Test `TranslationClient` (Core/Translation/) pakai `MockHttpMessageHandler`:
 - HTTP 200 + valid body → return translated text.
 - Timeout di attempt 1, success di attempt 2 (pakai `Task.Delay` di handler) → 1 retry, return text, elapsed ~retry-delay.
@@ -83,11 +86,12 @@ Fase 3 **memperdalam & mengisi celah**, bukan replace. TIDAK refactor besar — 
 - Empty API key di constructor → throw di ctor (validation).
 - Pakai `ISetupTimer` atau sleep dengan margin, **HINDARI** `Thread.Sleep` persis sama dengan retry delay (flaky).
 
-**Output**: `tests/.../Translation/TranslationClientTests.cs`, min 7 test cases.
-**Done when**: `dotnet test --filter TranslationClient` all green.
+**Output**: `tests/.../Translation/TranslationClientTests.cs`, min 7 test cases. — 10 cases implemented.
+**Done when**: `dotnet test --filter TranslationClient` all green. ✅
 **Depends on**: T28.
 
 #### T31. Tests: SettingsStore (DPAPI + JSON round-trip + corruption)
+**Status**: ✅ done (commit `2d50543`).
 **Deskripsi**: Test `SettingsStore` (Core/Config/) pakai `TempAppDataFixture`:
 - Save settings → load → semua field equal (ApiKey di-decrypt benar).
 - ApiKey di file hasil save = base64, BUKAN plaintext (grep).
@@ -95,11 +99,12 @@ Fase 3 **memperdalam & mengisi celah**, bukan replace. TIDAK refactor besar — 
 - File corrupt (JSON invalid) → `Load()` return default, log warning (capture log pakai `ILogger` mock atau `TestOutputHelper`).
 - DPAPI di-test round-trip minimal 1 case (sisanya covered by `DataProtectionScope.CurrentUser` Microsoft sendiri).
 
-**Output**: `tests/.../Config/SettingsStoreTests.cs`, min 5 test cases.
-**Done when**: `dotnet test --filter SettingsStore` all green.
+**Output**: `tests/.../Config/SettingsStoreTests.cs`, min 5 test cases. — 6 cases implemented.
+**Done when**: `dotnet test --filter SettingsStore` all green. ✅
 **Depends on**: T28.
 
 #### T32. Tests: TranslationCache (hash + get/put + DB cleanup)
+**Status**: ✅ done (commit `1979821`).
 **Deskripsi**: Test `TranslationCacheRepository` (Core/Cache/) pakai in-memory SQLite (`:memory:` connection):
 - Put `("Hello", "Halo", "id")` → Get return `"Halo"`.
 - Get untuk teks yang tidak ada → return `null`.
@@ -108,9 +113,14 @@ Fase 3 **memperdalam & mengisi celah**, bukan replace. TIDAK refactor besar — 
 - Same source text + lang overwrite OK (replace).
 - Cleanup: `DeleteOlderThan(DateTime)` remove entries created sebelum cutoff.
 
-**Output**: `tests/.../Cache/TranslationCacheTests.cs`, min 5 test cases.
-**Done when**: `dotnet test --filter TranslationCache` all green.
+**Output**: `tests/.../Cache/TranslationCacheTests.cs`, min 5 test cases. — 7 cases implemented.
+**Done when**: `dotnet test --filter TranslationCache` all green. ✅
 **Depends on**: T28.
+
+**Side fixes (bundled in T32 commit):**
+- `Database.EnsureSchema` skip `Directory.CreateDirectory` ketika path kosong (`:memory:` SQLite test mode).
+- `TranslationCacheRepository.Put` accept optional `DateTime? createdAt` parameter (back-compat default `DateTime.UtcNow`).
+- Tambah `TranslationCacheRepository.DeleteOlderThan(DateTime cutoff)` (spec T32 meminta method ini).
 
 ---
 
