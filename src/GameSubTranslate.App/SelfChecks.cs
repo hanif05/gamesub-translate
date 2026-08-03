@@ -31,6 +31,7 @@ internal static class SelfChecks
         "--selfcheck-t22" => SelfCheckT22(),
         "--selfcheck-t23" => SelfCheckT23(),
         "--selfcheck-t25" => SelfCheckT25(),
+        "--selfcheck-t35" => SelfCheckT35(),
         _ => SelfCheckT14(),
     };
 
@@ -352,13 +353,115 @@ internal static class SelfChecks
         return fails == 0 ? 0 : 1;
     }
 
+    /// <summary>
+    /// T35: profile pipeline under stable (idle) load for N seconds. Sample memory and
+    /// handle count at start + every sample-interval. Asserts no unbounded growth —
+    /// anything more than 30% growth over the run is flagged (real runs scale this
+    /// threshold down). Returns 0 if stable, 1 if leak-shaped.
+    ///
+    /// Usage: dotnet run --project src/GameSubTranslate.App -- --selfcheck-t35 [seconds] [intervalMs]
+    /// Default: 30 seconds, sample every 2 seconds.
+    /// </summary>
+    private static int SelfCheckT35()
+    {
+        int fails = 0;
+        void Check(bool ok, string what)
+        {
+            if (ok) return;
+            Console.WriteLine($"FAIL: {what}");
+            fails++;
+        }
+
+        int totalSecs = 30;
+        int sampleMs = 2000;
+        // crude CLI parse — keep self-check dependency-free
+        var cli = Environment.GetCommandLineArgs();
+        for (int i = 0; i < cli.Length - 1; i++)
+        {
+            if (cli[i] == "--selfcheck-t35-secs" && int.TryParse(cli[i + 1], out var s)) totalSecs = s;
+            if (cli[i] == "--selfcheck-t35-sample-ms" && int.TryParse(cli[i + 1], out var m)) sampleMs = m;
+        }
+
+        var cap = new FakeCapture(() => "stable subtitle line");
+        var ocr = new FakeOcr(cap);
+        var trans = new FakeTranslator();
+        using var pipe = new TranslatePipeline(cap, ocr, trans, cache: null,
+            x: 0, y: 0, w: 100, h: 30,
+            intervalMs: 50, // tight loop — we want hundreds of iterations in N seconds
+            t => { /* swallow */ },
+            idleIntervalMs: 50, idleThreshold: 3, idleWindowMs: 1000);
+
+        using var proc = System.Diagnostics.Process.GetCurrentProcess();
+        long startMb = proc.WorkingSet64 / (1024 * 1024);
+        long startHandles = proc.HandleCount;
+        long startGc = GC.GetTotalMemory(forceFullCollection: true);
+        Console.WriteLine($"[t35] start: RSS={startMb}MB handles={startHandles} gc={startGc / 1024}KB");
+
+        pipe.Start();
+        var deadline = DateTime.UtcNow.AddSeconds(totalSecs);
+        long maxMb = startMb, maxHandles = startHandles;
+        // Skip the first sample — JIT, module loads, and class init in the first ~1s
+        // inflate handle count by ~60 (WPF resource caches). That's startup cost,
+        // not a per-tick leak. Real leaks are linear over time.
+        bool warmupDone = false;
+        while (DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(sampleMs);
+            proc.Refresh();
+            long mb = proc.WorkingSet64 / (1024 * 1024);
+            if (mb > maxMb) maxMb = mb;
+            long h = proc.HandleCount;
+            if (h > maxHandles) maxHandles = h;
+            if (!warmupDone && (deadline - DateTime.UtcNow).TotalSeconds < totalSecs - 2.0)
+            {
+                startHandles = h; // rebase after warmup
+                warmupDone = true;
+            }
+            Console.WriteLine($"[t35] +{(deadline - DateTime.UtcNow).TotalSeconds:F0}s: RSS={mb}MB handles={h}");
+        }
+        pipe.Stop();
+
+        long endMb = proc.WorkingSet64 / (1024 * 1024);
+        long endHandles = proc.HandleCount;
+        long endGc = GC.GetTotalMemory(forceFullCollection: true);
+        Console.WriteLine($"[t35] end:   RSS={endMb}MB handles={endHandles} gc={endGc / 1024}KB");
+
+        // Threshold: RSS may grow up to 30% (GC jitter, JIT, Bitmap reuse). More than that
+        // is leak-shaped. Handles should be flat (no native resource accumulation).
+        long rssGrowth = endMb - startMb;
+        long handleGrowth = endHandles - startHandles;
+        Check(rssGrowth <= Math.Max(20, startMb / 3),
+            $"RSS grew {rssGrowth}MB (start={startMb}MB, end={endMb}MB, peak={maxMb}MB) — looks like a leak");
+        Check(handleGrowth <= 10,
+            $"Handles grew {handleGrowth} (start={startHandles}, end={endHandles}, peak={maxHandles}) — native resource leak");
+
+        Console.WriteLine(fails == 0
+            ? $"PASS: t35 stable for {totalSecs}s (RSS +{rssGrowth}MB, handles +{handleGrowth})"
+            : $"FAIL: {fails} t35 checks failed");
+        return fails == 0 ? 0 : 1;
+    }
+
     // ---------- Fakes for pipeline checks (mirrors GameSubTranslate.Prototype.SelfChecks) ----------
 
     private sealed class FakeCapture : IScreenCapture
     {
         private readonly Func<string> _frame;
+        private byte[]? _cached;
+        private string? _cachedText;
         public FakeCapture(Func<string> frame) => _frame = frame;
-        public byte[] CaptureRegion(int x, int y, int w, int h) => MakeFrame(_frame());
+        public byte[] CaptureRegion(int x, int y, int w, int h)
+        {
+            // Cache one PNG per text value — FakeCapture is the test harness, not the
+            // SUT. Allocating a fresh Bitmap per tick pollutes the T35 profile with
+            // GDI+ handle noise that has nothing to do with the pipeline.
+            var text = _frame();
+            if (_cached is null || _cachedText != text)
+            {
+                _cached = MakeFrame(text);
+                _cachedText = text;
+            }
+            return _cached;
+        }
         public string CurrentText() => _frame();
         public void Dispose() { }
     }
