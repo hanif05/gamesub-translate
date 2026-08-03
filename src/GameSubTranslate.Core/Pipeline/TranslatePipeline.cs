@@ -25,6 +25,11 @@ public sealed class TranslatePipeline : IDisposable
     private readonly TranslationClient? _translator;
     private readonly TranslationCacheRepository? _cache;
     private readonly Action<string> _onTranslated;
+    // T36: incremental token callback for streaming. When set, the loop streams tokens to the
+    // overlay instead of waiting for the full response. Null → fall back to single-shot.
+    private readonly Action<string>? _onToken;
+    private readonly Action? _onStreamStart;
+    private readonly Action? _onStreamEnd;
     private readonly int _x, _y, _w, _h, _intervalMs;
     private readonly int _idleIntervalMs;
     private readonly int _idleThreshold;
@@ -56,6 +61,7 @@ public sealed class TranslatePipeline : IDisposable
     public TranslatePipeline(IScreenCapture capture, IOcrEngine ocr, TranslationClient? translator,
         TranslationCacheRepository? cache, int x, int y, int w, int h, int intervalMs,
         Action<string> onTranslated,
+        Action<string>? onToken = null, Action? onStreamStart = null, Action? onStreamEnd = null,
         int idleIntervalMs = 3000, int idleThreshold = 3, int idleWindowMs = 5000)
     {
         _capture = capture;
@@ -67,11 +73,15 @@ public sealed class TranslatePipeline : IDisposable
         _idleThreshold = idleThreshold;
         _idleWindowMs = idleWindowMs;
         _onTranslated = onTranslated;
+        _onToken = onToken;
+        _onStreamStart = onStreamStart;
+        _onStreamEnd = onStreamEnd;
     }
 
     /// <summary>Builds a pipeline over the real WGC capture for the monitor containing (x,y).</summary>
     public static TranslatePipeline ForEnvironment(int x, int y, int w, int h, int intervalMs,
         IOcrEngine ocr, AppConfig cfg, TranslationCacheRepository? cache, Action<string> onTranslated,
+        Action<string>? onToken = null, Action? onStreamStart = null, Action? onStreamEnd = null,
         int idleIntervalMs = 3000, int idleThreshold = 3, int idleWindowMs = 5000)
     {
         TranslationClient? translator = null;
@@ -79,6 +89,7 @@ public sealed class TranslatePipeline : IDisposable
             translator = new TranslationClient(cfg.ApiKey!, cfg.BaseUrl!, cfg.Model!, cfg.SourceLang, cfg.TargetLang);
         return new TranslatePipeline(ScreenCapture.ForMonitorAt(x, y), ocr, translator, cache,
             x, y, w, h, intervalMs, onTranslated,
+            onToken, onStreamStart, onStreamEnd,
             idleIntervalMs, idleThreshold, idleWindowMs);
     }
 
@@ -199,9 +210,7 @@ public sealed class TranslatePipeline : IDisposable
                             if (!string.IsNullOrWhiteSpace(text) && text != _lastText)
                             {
                                 _lastText = text;
-                                string? translated = await TranslateAsync(text, ct);
-                                if (translated is not null)
-                                    _onTranslated(translated);
+                                await TranslateAndShowAsync(text, ct);
                             }
                         }
                         else
@@ -265,5 +274,80 @@ public sealed class TranslatePipeline : IDisposable
             StatusChanged?.Invoke(LastError);
             return null;
         }
+    }
+
+    /// <summary>
+    /// T36: real-time translation + display. Cache hit → single-shot path (full text immediately).
+    /// Cache miss + streaming callback set → stream tokens incrementally to the overlay.
+    /// Cache miss + no streaming callback → falls back to <see cref="TranslateAsync"/> for back-compat.
+    /// </summary>
+    private async Task<string?> TranslateAndShowAsync(string text, CancellationToken ct)
+    {
+        // Cache hit short-circuits both streaming and the single-shot path — we already have the
+        // answer, so stream it as one chunk through the same code path for consistency.
+        string? cached = _cache?.Get(text, _translator?.TargetLang ?? "");
+        if (cached is not null)
+        {
+            _onStreamStart?.Invoke();
+            _onToken?.Invoke(cached);
+            _onStreamEnd?.Invoke();
+            _onTranslated(cached);
+            return cached;
+        }
+
+        if (_translator is null) return text; // passthrough
+
+        if (_onToken is null)
+        {
+            // No streaming wiring → keep the old single-shot path.
+            var translated = await TranslateAsync(text, ct);
+            if (translated is not null) _onTranslated(translated);
+            return translated;
+        }
+
+        // Streaming path: yield tokens to the overlay as they arrive, accumulate for cache write.
+        var sw = Stopwatch.StartNew();
+        var buffer = new System.Text.StringBuilder();
+        DateTime firstTokenAt = default;
+        try
+        {
+            _onStreamStart?.Invoke();
+            await foreach (var token in _translator.TranslateStreamAsync(text, ct).WithCancellation(ct))
+            {
+                if (firstTokenAt == default) firstTokenAt = DateTime.UtcNow;
+                buffer.Append(token);
+                _onToken(token);
+            }
+            _onStreamEnd?.Invoke();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _onStreamEnd?.Invoke();
+            LastError = $"[translate-error] {ex.Message}";
+            StatusChanged?.Invoke(LastError);
+            return null;
+        }
+
+        var full = buffer.ToString();
+        sw.Stop();
+        if (firstTokenAt != default)
+        {
+            var firstTokenMs = (firstTokenAt - DateTime.UtcNow.AddMilliseconds(-sw.Elapsed.TotalMilliseconds)).TotalMilliseconds;
+            Console.WriteLine($"[latency] first-token~{firstTokenMs:F0}ms total={sw.Elapsed.TotalMilliseconds:F0}ms \"{text}\" -> \"{full}\"");
+        }
+        else
+        {
+            Console.WriteLine($"[latency] {sw.Elapsed.TotalMilliseconds:F0}ms \"{text}\" -> \"{full}\" (no tokens)");
+        }
+        if (full.Length > 0)
+        {
+            _onTranslated(full);
+            if (_cache is not null) _cache.Put(text, full, _translator.TargetLang);
+        }
+        return full.Length > 0 ? full : null;
     }
 }

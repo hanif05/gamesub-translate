@@ -183,6 +183,23 @@ public partial class OverlayWindow : Window
         TextCard.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
     }
 
+    /// <summary>T36: start a streaming pass — clears the overlay text so tokens start fresh.</summary>
+    public void BeginStream()
+    {
+        ViewModel.BeginStream();
+        TextCard.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>T36: append a streaming token to the overlay (already shown after BeginStream).</summary>
+    public void AppendToken(string token) => ViewModel.AppendToken(token);
+
+    /// <summary>T36: end the streaming pass — collapses the card if no tokens arrived.</summary>
+    public void EndStream()
+    {
+        ViewModel.EndStream();
+        if (string.IsNullOrEmpty(ViewModel.Text)) TextCard.Visibility = Visibility.Collapsed;
+    }
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);

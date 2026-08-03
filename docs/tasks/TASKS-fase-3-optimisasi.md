@@ -183,6 +183,7 @@ Catat hasil di section "Hasil Verifikasi" T42.
 ### FASE 3.C — Translation Quality
 
 #### T36. Streaming translation (SSE)
+**Status**: ✅ done (commit `<pending>`).
 **Deskripsi**: Tambah method `IAsyncEnumerable<string> TranslateStreamAsync(string text, CancellationToken ct)` ke `TranslationClient` untuk support streaming response dari endpoint OpenAI-compatible yang support SSE (`stream=true` di body). Pakai `HttpClient.SendAsync` dengan `HttpCompletionOption.ResponseHeadersRead`, baca stream line-by-line (`data: {...}\n\n`), parse JSON per chunk, extract `choices[0].delta.content`.
 
 **⚠ Backward compatibility (PENTING — T30 test suite tidak boleh jadi outdated):**

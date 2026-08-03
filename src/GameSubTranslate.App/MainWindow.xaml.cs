@@ -250,11 +250,15 @@ public partial class MainWindow : Window
         var ocr = new TesseractOcrEngine();
         _pipeline = TranslatePipeline.ForEnvironment(
             region.X, region.Y, region.Width, region.Height, _settings.CaptureIntervalMs,
-            ocr, cfg, cache: new TranslationCacheRepository(_db), t => Dispatcher.Invoke(() =>
+            ocr, cfg, cache: new TranslationCacheRepository(_db),
+            onTranslated: t => Dispatcher.Invoke(() =>
             {
                 SetStatus($"dst: {t}");
                 _overlay?.ShowText(t); // T22: translated text lands on the overlay.
-            }));
+            }),
+            onToken: token => Dispatcher.Invoke(() => _overlay?.AppendToken(token)),
+            onStreamStart: () => Dispatcher.Invoke(() => _overlay?.BeginStream()),
+            onStreamEnd: () => Dispatcher.Invoke(() => _overlay?.EndStream()));
 
         // T26 scenario 10: surface pipeline/translation errors on the overlay too, so a dead API
         // key is visible over the game instead of the overlay silently staying empty.
