@@ -293,7 +293,7 @@ public interface IOcrEngine {
 **Depends on**: T3 (Fase 2 settings), T12 (Fase 2), T39 (kategorisasi error).
 
 #### T41. Persistent error log with rotation
-**Status**: ✅ done (commit `T41HASH`).
+**Status**: ✅ done (commit `2299652`).
 **Deskripsi**: Tambah logger sederhana (hand-roll, no NuGet — pakai `StreamWriter` ke file):
 - Folder `%APPDATA%/GameSubTranslate/logs/` dengan file `app-YYYY-MM-DD.log`.
 - Log level: `Info`, `Warn`, `Error`. Filter: `Warn`+ ke file, `Info` hanya ke file debug.
