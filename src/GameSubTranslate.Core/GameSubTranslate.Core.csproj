@@ -27,4 +27,11 @@
     <Content Include="..\..\assets\tessdata\*.traineddata" Link="tessdata\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- T40: tests set TranslationClient.PrimaryRetryAfter to shrink the failover window. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>GameSubTranslate.Core.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

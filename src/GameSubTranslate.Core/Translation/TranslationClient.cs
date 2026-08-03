@@ -4,8 +4,12 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using GameSubTranslate.Config;
 
 namespace GameSubTranslate.Translation;
+
+/// <summary>An endpoint (HttpClient + URL + model + display name). One per provider.</summary>
+internal sealed record ProviderEndpoint(HttpClient Http, string BaseUrl, string Model, string Name);
 
 /// <summary>T39: classification of a translation failure so the UI can show an actionable hint.</summary>
 public enum ErrorCategory
@@ -44,28 +48,104 @@ public class TranslationClient
     // Initial call + 3 retries with backoff 1s -> 2s -> 4s (total ~7s worst case).
     private const int MaxAttempts = 4;
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
+    // T40: consecutive Network/Provider retryable failures before the client hops to the next
+    // provider. Auth / BadRequest / RateLimit never count toward this (a bad key or a throttle
+    // won't be fixed by a different endpoint).
+    private const int FailoverThreshold = 3;
+    // T40: after the app is degraded (on a fallback), it re-probes the primary this often.
+    // When the primary recovers, the next translate goes back to it and clears "degraded".
+    // Internal setter so tests can shrink the window without waiting 5 minutes.
+    internal static TimeSpan PrimaryRetryAfter = TimeSpan.FromMinutes(5);
 
-    private readonly HttpClient _http;
-    private readonly string _baseUrl;
-    private readonly string _model;
     private readonly string _sourceLang;
     private readonly string _targetLang;
+    private readonly List<ProviderEndpoint> _endpoints;
+    private int _currentIndex;
+    private int _failStreak;
+    private bool _degraded;
+    private DateTime _degradedSince = DateTime.UtcNow;
 
+    /// <summary>Raised when the client switches providers (name) or returns to the primary
+    /// ("primary"). Lets the UI surface a "degraded" marker over the game.</summary>
+    public event Action<string?>? FailoverChanged;
+
+    private ProviderEndpoint Current => _endpoints[_currentIndex];
+    /// <summary>True while a fallback provider is in use (primary failed).</summary>
+    public bool IsDegraded => _degraded;
+
+    /// <summary>
+    /// Builds a translation client over a primary provider + optional T40 fallbacks. The primary
+    /// is the legacy ApiKey/BaseUrl/Model triplet; <see cref="ProviderConfig"/> entries from
+    /// AppSettings are appended as backups. handler is overridden in tests to stub HTTP.
+    /// </summary>
     public TranslationClient(string apiKey, string baseUrl, string model, string sourceLang, string targetLang,
-        HttpMessageHandler? handler = null)
+        HttpMessageHandler? handler = null, IEnumerable<ProviderConfig>? providers = null)
     {
-        _baseUrl = baseUrl.TrimEnd('/');
-        _model = model;
         _sourceLang = sourceLang;
         _targetLang = targetLang;
-        _http = new HttpClient(handler ?? new HttpClientHandler()) { Timeout = Timeout };
-        _http.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+        _endpoints = new List<ProviderEndpoint> { Endpoint(apiKey, baseUrl, model, handler, name: "primary") };
+        if (providers is not null)
+            foreach (var p in providers)
+                if (IsEndpointSet(p)) _endpoints.Add(Endpoint(p.ApiKey!, p.BaseUrl!, p.Model!, handler, p.Name));
     }
 
-    public bool IsConfigured => !string.IsNullOrEmpty(_model);
+    private static ProviderEndpoint Endpoint(string apiKey, string baseUrl, string model,
+        HttpMessageHandler? handler, string name)
+    {
+        var http = new HttpClient(handler ?? new HttpClientHandler()) { Timeout = Timeout };
+        http.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+        return new ProviderEndpoint(http, baseUrl.TrimEnd('/'), model, name);
+    }
+
+    private static bool IsEndpointSet(ProviderConfig p)
+        => !string.IsNullOrWhiteSpace(p.BaseUrl) && !string.IsNullOrWhiteSpace(p.ApiKey)
+           && !string.IsNullOrWhiteSpace(p.Model);
+
+    public bool IsConfigured => _endpoints[0].Model.Length > 0;
 
     public string TargetLang => _targetLang;
+
+    // ---- T40 failover state machine ----
+
+    /// <summary>
+    /// Re-checks degraded state before each call. If we're on a fallback and the primary-retry
+    /// window has elapsed, hop back to the primary — the next request probes it and either clears
+    /// the streak (success) or fails over again (still down).
+    /// </summary>
+    private void FailoverUpdate()
+    {
+        if (!_degraded) return;
+        if (DateTime.UtcNow - _degradedSince < PrimaryRetryAfter) return;
+        _currentIndex = 0;
+        _failStreak = 0;
+        _degraded = false;
+        FailoverChanged?.Invoke("primary");
+    }
+
+    /// <summary>T40: only Network/Provider count toward the failover threshold — a bad key (Auth),
+    /// a malformed request (BadRequest), or a throttle (RateLimit) won't be fixed by another endpoint.</summary>
+    private void MarkFailure(ErrorCategory category)
+    {
+        if (category is ErrorCategory.Network or ErrorCategory.Provider)
+            _failStreak++;
+    }
+
+    private void OnRetryableFailure(ErrorCategory category)
+    {
+        MarkFailure(category);
+        if (_failStreak >= FailoverThreshold) TryNextProvider();
+    }
+
+    private void TryNextProvider()
+    {
+        if (_currentIndex + 1 >= _endpoints.Count) return; // no fallback configured
+        _currentIndex++;
+        _failStreak = 0;
+        _degraded = true;
+        _degradedSince = DateTime.UtcNow;
+        FailoverChanged?.Invoke(Current.Name);
+    }
 
     public virtual async Task<string?> TranslateAsync(string text, CancellationToken ct = default)
     {
@@ -74,17 +154,22 @@ public class TranslationClient
 
         // Retry loop: retryable categories (429, 5xx, network/timeout) retry with backoff;
         // Auth/BadRequest are fatal and surface immediately; caller-cancel rethrows.
+        // T40: after FailoverThreshold retryable failures the client hops to the next provider;
+        // the primary is re-probed after PrimaryRetryAfter and, on success, "degraded" clears.
+        FailoverUpdate(); // refresh degraded state + re-probe primary if the window elapsed
         TranslationException? last = null;
         for (int attempt = 1; ; attempt++)
         {
             try
             {
-                return await TranslateOnceAsync(text, ct);
+                string? result = await TranslateOnceAsync(text, ct);
+                if (_failStreak > 0 && _currentIndex == 0) _failStreak = 0; // primary recovered
+                return result;
             }
             catch (TranslationException ex)
             {
-                if (!ex.Retryable) throw;
-                last = ex; // retryable — fall through to the backoff below
+                if (!ex.Retryable) { MarkFailure(ex.Category); throw; }
+                last = ex; OnRetryableFailure(ex.Category);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -94,11 +179,13 @@ public class TranslationClient
             {
                 // HttpClient.Timeout fired — network category, retryable.
                 last = new TranslationException("Translation request timed out", ErrorCategory.Network);
+                OnRetryableFailure(ErrorCategory.Network);
             }
             catch (HttpRequestException ex)
             {
                 // DNS / connection refused / TLS — network category, retryable.
                 last = new TranslationException($"Translation request failed: {ex.Message}", ErrorCategory.Network, ex);
+                OnRetryableFailure(ErrorCategory.Network);
             }
             catch (Exception ex)
             {
@@ -142,9 +229,10 @@ public class TranslationClient
         if (!IsConfigured) { yield break; }
 
         var systemPrompt = $"Kamu adalah mesin penerjemah subtitle game. Terjemahkan teks berikut dari {_sourceLang} ke {_targetLang}. Jawab HANYA dengan hasil terjemahan, tanpa penjelasan tambahan, tanpa tanda kutip.";
+        var ep = Current;
         var req = new
         {
-            model = _model,
+            model = ep.Model,
             stream = true,
             messages = new[]
             {
@@ -153,13 +241,13 @@ public class TranslationClient
             }
         };
 
-        using var httpReq = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/chat/completions")
+        using var httpReq = new HttpRequestMessage(HttpMethod.Post, $"{ep.BaseUrl}/chat/completions")
         {
             Content = JsonContent.Create(req),
         };
         // ResponseHeadersRead so we start consuming the body as soon as headers come back,
         // not after the full body is buffered — that's the whole point of streaming.
-        using var resp = await _http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var resp = await ep.Http.SendAsync(httpReq, HttpCompletionOption.ResponseHeadersRead, ct);
 
         if (!resp.IsSuccessStatusCode)
         {
@@ -273,10 +361,10 @@ public class TranslationClient
     private async Task<string?> TranslateOnceAsync(string text, CancellationToken ct)
     {
         var systemPrompt = $"Kamu adalah mesin penerjemah subtitle game. Terjemahkan teks berikut dari {_sourceLang} ke {_targetLang}. Jawab HANYA dengan hasil terjemahan, tanpa penjelasan tambahan, tanpa tanda kutip.";
-
+        var ep = Current;
         var req = new
         {
-            model = _model,
+            model = ep.Model,
             messages = new[]
             {
                 new { role = "system", content = systemPrompt },
@@ -284,7 +372,7 @@ public class TranslationClient
             }
         };
 
-        using var resp = await _http.PostAsJsonAsync($"{_baseUrl}/chat/completions", req, ct);
+        using var resp = await ep.Http.PostAsJsonAsync($"{ep.BaseUrl}/chat/completions", req, ct);
         if (!resp.IsSuccessStatusCode)
             throw TranslateStatusException(resp);
 

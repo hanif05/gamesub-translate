@@ -26,6 +26,21 @@
                                 Width="130" Margin="8,0,0,0" Click="TestConnection_Click"/>
                         <TextBlock x:Name="TestResult" VerticalAlignment="Center" TextWrapping="Wrap" Text=""/>
                     </DockPanel>
+
+                    <!-- T40: fallback providers. Primary (above) is always tried first; if it fails
+                         3x with Network/Provider errors, the client hops here in list order. -->
+                    <TextBlock Text="Fallback providers" FontWeight="SemiBold" Margin="0,14,0,4"/>
+                    <DockPanel Margin="0,0,0,6">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Content="Add" Width="52" Margin="6,0,4,0" Click="ProviderAdd_Click"/>
+                            <Button Content="Edit" Width="52" Margin="0,0,4,0" Click="ProviderEdit_Click"/>
+                            <Button Content="Remove" Width="62" Click="ProviderRemove_Click"/>
+                        </StackPanel>
+                        <ListBox x:Name="ProviderList" MinHeight="70" DisplayMemberPath="Name"
+                                 SelectionChanged="ProviderList_SelectionChanged"/>
+                    </DockPanel>
+                    <TextBlock Text="Fallback is tried when the primary fails 3× (Network/Provider). A bad API key never failovers."
+                               Foreground="Gray" TextWrapping="Wrap" FontSize="11"/>
                 </StackPanel>
             </TabItem>
 

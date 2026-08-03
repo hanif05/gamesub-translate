@@ -278,6 +278,7 @@ public interface IOcrEngine {
 ### FASE 3.D — Reliability
 
 #### T40. Provider failover (primary + fallback)
+**Status**: ✅ done (commit `<T40HASH>`).
 **Deskripsi**: Extend `AppSettings`:
 - `Provider` list: `List<ProviderConfig>` (satu entry default untuk back-compat), masing-masing `Name`, `BaseUrl`, `ApiKey`, `Model`, `IsPrimary`.
 - UI: Settings tab "API & Model" jadi dynamic — bisa add/remove provider, drag reorder primary.

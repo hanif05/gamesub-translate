@@ -244,6 +244,7 @@ public partial class MainWindow : Window
             Model = _settings.Model,
             SourceLang = _settings.SourceLang,
             TargetLang = _settings.TargetLang,
+            Providers = _settings.Providers,
         };
         if (!cfg.TranslationEnabled) { SetStatus("Translation not configured — set API key in Settings."); return null; }
 
@@ -275,6 +276,13 @@ public partial class MainWindow : Window
                 _overlay?.ShowText($"⚠ {s}");
                 ErrorReported?.Invoke(s);
             }
+        });
+
+        // T40: failover to a fallback provider (or back to primary) surfaces a "degraded" marker
+        // on the overlay so the user knows the fallback is doing the work.
+        _pipeline.TranslatorFailover += name => Dispatcher.Invoke(() =>
+        {
+            _overlay?.ShowText(name == "primary" ? "✅ back on primary" : $"⚠ degraded: {name}");
         });
         return _pipeline;
     }

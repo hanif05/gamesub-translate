@@ -53,6 +53,10 @@ public sealed class TranslatePipeline : IDisposable
     /// <summary>Raised on state changes ("started", "paused", errors…). May fire off the UI thread.</summary>
     public event Action<string>? StatusChanged;
 
+    /// <summary>T40: raised when the translator switches to a fallback provider (name) or back to
+    /// the primary ("primary"). Lets the UI mark the overlay "degraded". May fire off the UI thread.</summary>
+    public event Action<string>? TranslatorFailover;
+
     public bool IsRunning => _running;
     public bool IsPaused => _paused;
     /// <summary>Last non-fatal pipeline/translation error, or null while healthy.</summary>
@@ -86,11 +90,16 @@ public sealed class TranslatePipeline : IDisposable
     {
         TranslationClient? translator = null;
         if (cfg.TranslationEnabled)
-            translator = new TranslationClient(cfg.ApiKey!, cfg.BaseUrl!, cfg.Model!, cfg.SourceLang, cfg.TargetLang);
-        return new TranslatePipeline(ScreenCapture.ForMonitorAt(x, y), ocr, translator, cache,
+            translator = new TranslationClient(cfg.ApiKey!, cfg.BaseUrl!, cfg.Model!, cfg.SourceLang, cfg.TargetLang,
+                providers: cfg.Providers);
+        var pipeline = new TranslatePipeline(ScreenCapture.ForMonitorAt(x, y), ocr, translator, cache,
             x, y, w, h, intervalMs, onTranslated,
             onToken, onStreamStart, onStreamEnd,
             idleIntervalMs, idleThreshold, idleWindowMs);
+        // T40: hop events bubble out so the app can flag "degraded" on the overlay.
+        if (translator is not null)
+            translator.FailoverChanged += name => pipeline.TranslatorFailover?.Invoke(name ?? "primary");
+        return pipeline;
     }
 
     public void Start()

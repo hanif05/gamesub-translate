@@ -6,6 +6,17 @@ public enum OcrEngineKind
     VisionAi,
 }
 
+/// <summary>T40: one translation provider endpoint. Users can add a fallback so a dead primary
+/// auto-switches to a backup (see TranslationClient failover). The legacy ApiKey/BaseUrl/Model
+/// fields on AppSettings remain the primary provider for back-compat.</summary>
+public sealed class ProviderConfig
+{
+    public string Name { get; set; } = "";
+    public string? BaseUrl { get; set; }
+    public string? ApiKey { get; set; }
+    public string? Model { get; set; }
+}
+
 public sealed class AppSettings
 {
     public string? ApiKey { get; set; }
@@ -41,6 +52,10 @@ public sealed class AppSettings
     // Last-active state (T9) so the active region survives restarts.
     public int? ActiveProfileId { get; set; }
     public int? ActiveRegionId { get; set; }
+
+    /// <summary>T40: fallback providers tried in order after the primary fails 3x consecutive
+    /// (Network/Provider only — Auth/BadRequest/RateLimit never failover).</summary>
+    public List<ProviderConfig> Providers { get; set; } = new();
 
     public bool TranslationEnabled =>
         !string.IsNullOrWhiteSpace(ApiKey) &&
