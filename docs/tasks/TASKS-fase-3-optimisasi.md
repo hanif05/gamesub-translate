@@ -206,6 +206,7 @@ Catat hasil di section "Hasil Verifikasi" T42.
 **Depends on**: T12 (Fase 2).
 
 #### T37. Fuzzy cache match
+**Status**: ✅ done (commit `<pending>`).
 **Deskripsi**: Update `TranslationCacheRepository`:
 - Tambah `GetFuzzy(string sourceText, string targetLang, double similarityThreshold) -> (string translated, double similarity)?`.
 - Similarity: **Normalized Levenshtein distance** (`1 - editDistance / max(lenA, lenB)`), threshold default 0.85.

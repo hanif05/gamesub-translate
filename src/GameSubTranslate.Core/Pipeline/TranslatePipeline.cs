@@ -256,8 +256,7 @@ public sealed class TranslatePipeline : IDisposable
 
             // T26 scenario 8: end-to-end latency from subtitle change to translated output.
             var sw = Stopwatch.StartNew();
-            string? translated = _cache?.Get(text, _translator.TargetLang)
-                ?? await _translator.TranslateAsync(text, ct);
+            string? translated = LookupCached(text) ?? await _translator.TranslateAsync(text, ct);
             sw.Stop();
             Console.WriteLine($"[latency] {sw.Elapsed.TotalMilliseconds:F0}ms \"{text}\" -> \"{translated}\"");
             if (translated is not null && _cache is not null)
@@ -277,6 +276,25 @@ public sealed class TranslatePipeline : IDisposable
     }
 
     /// <summary>
+    /// T37: exact-match first, then fuzzy by Levenshtein against recent cache rows. Returns
+    /// null if neither hits — caller falls through to a fresh API call. Logs a [cache-fuzzy]
+    /// marker when fuzzy saves a round-trip so the operator can see how often it kicks in.
+    /// </summary>
+    private string? LookupCached(string text)
+    {
+        if (_cache is null || _translator is null) return null;
+        var exact = _cache.Get(text, _translator.TargetLang);
+        if (exact is not null) return exact;
+        var fuzzy = _cache.GetFuzzy(text, _translator.TargetLang);
+        if (fuzzy is { } f)
+        {
+            Console.WriteLine($"[cache-fuzzy] similarity={f.similarity:F2} \"{text}\" -> \"{f.translated}\"");
+            return f.translated;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// T36: real-time translation + display. Cache hit → single-shot path (full text immediately).
     /// Cache miss + streaming callback set → stream tokens incrementally to the overlay.
     /// Cache miss + no streaming callback → falls back to <see cref="TranslateAsync"/> for back-compat.
@@ -285,7 +303,7 @@ public sealed class TranslatePipeline : IDisposable
     {
         // Cache hit short-circuits both streaming and the single-shot path — we already have the
         // answer, so stream it as one chunk through the same code path for consistency.
-        string? cached = _cache?.Get(text, _translator?.TargetLang ?? "");
+        var cached = LookupCached(text);
         if (cached is not null)
         {
             _onStreamStart?.Invoke();

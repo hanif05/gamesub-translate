@@ -90,4 +90,97 @@ public class TranslationCacheTests : IDisposable
         var deleted = _repo.DeleteOlderThan(DateTime.UtcNow.AddDays(-1));
         Assert.Equal(0, deleted);
     }
+
+    // ---- T37 fuzzy match ----
+
+    [Fact]
+    public void GetFuzzy_OneCharDiff_ReturnsCachedAboveThreshold()
+    {
+        _repo.Put("Hello world", "Halo dunia", "id");
+        var hit = _repo.GetFuzzy("Hello worlds", "id", similarityThreshold: 0.85);
+        Assert.NotNull(hit);
+        Assert.Equal("Halo dunia", hit!.Value.translated);
+        // 10/11 = 0.909 expected.
+        Assert.InRange(hit.Value.similarity, 0.85, 1.0);
+    }
+
+    [Fact]
+    public void GetFuzzy_TotallyDifferentText_ReturnsNull()
+    {
+        _repo.Put("Hello world", "Halo dunia", "id");
+        var hit = _repo.GetFuzzy("Completely unrelated sentence", "id", similarityThreshold: 0.85);
+        Assert.Null(hit);
+    }
+
+    [Fact]
+    public void GetFuzzy_BelowThreshold_ReturnsNull()
+    {
+        _repo.Put("Hello", "Halo", "id");
+        // "Hello" → "Hi" has distance 4, max 5 → similarity 0.2 < 0.85.
+        var hit = _repo.GetFuzzy("Hi", "id", similarityThreshold: 0.85);
+        Assert.Null(hit);
+    }
+
+    [Fact]
+    public void GetFuzzy_ExactMatchAlsoReturnedByExact_HitsFuzzyAtOne()
+    {
+        // Exact match should also clear the fuzzy bar (similarity = 1.0). The pipeline
+        // calls `Get` first, then `GetFuzzy` — so the exact path wins — but if a caller
+        // skips exact and goes straight to fuzzy, exact must still hit.
+        _repo.Put("Hello", "Halo", "id");
+        var hit = _repo.GetFuzzy("Hello", "id");
+        Assert.NotNull(hit);
+        Assert.Equal("Halo", hit!.Value.translated);
+        Assert.Equal(1.0, hit.Value.similarity, 6);
+    }
+
+    [Fact]
+    public void GetFuzzy_DifferentTargetLang_DoesNotMatch()
+    {
+        _repo.Put("Hello", "Halo", "id");
+        var hit = _repo.GetFuzzy("Hello worlds", "en", similarityThreshold: 0.85);
+        Assert.Null(hit); // only "id" rows exist, "en" cache is empty
+    }
+
+    [Fact]
+    public void GetFuzzy_PicksBestAmongMultipleCandidates()
+    {
+        // Two close-but-not-identical rows. The closer one must win.
+        _repo.Put("Hello world", "Halo dunia", "id");   // sim to "Hello worlds" ≈ 0.91
+        _repo.Put("Hello worlds!", "Halo dunia!", "id"); // sim to "Hello worlds" = 12/13 ≈ 0.92
+        var hit = _repo.GetFuzzy("Hello worlds", "id", similarityThreshold: 0.85);
+        Assert.NotNull(hit);
+        Assert.Equal("Halo dunia!", hit!.Value.translated);
+    }
+
+    [Fact]
+    public void NormalizedLevenshtein_Identical_IsOne()
+    {
+        Assert.Equal(1.0, TranslationCacheRepository.NormalizedLevenshteinSimilarity("Halo dunia", "Halo dunia"));
+    }
+
+    [Fact]
+    public void NormalizedLevenshtein_BothEmpty_IsOne()
+    {
+        // Edge: both empty strings are equal → distance 0 → similarity 1.
+        Assert.Equal(1.0, TranslationCacheRepository.NormalizedLevenshteinSimilarity("", ""));
+    }
+
+    [Fact]
+    public void NormalizedLevenshtein_OneEmpty_IsZero()
+    {
+        // Either side empty (other not) → no characters to compare → 0.
+        Assert.Equal(0.0, TranslationCacheRepository.NormalizedLevenshteinSimilarity("abc", ""));
+        Assert.Equal(0.0, TranslationCacheRepository.NormalizedLevenshteinSimilarity("", "abc"));
+    }
+
+    [Theory]
+    [InlineData("Halo dunia", "Halo Dunia", 9.0 / 10.0)]   // 1 substitution, both 10 chars
+    [InlineData("kitten", "sitting", 4.0 / 7.0)]            // canonical Levenshtein example
+    [InlineData("flaw", "lawn", 2.0 / 4.0)]                 // 2 substitutions
+    public void NormalizedLevenshtein_KnownCases(string a, string b, double expected)
+    {
+        var sim = TranslationCacheRepository.NormalizedLevenshteinSimilarity(a, b);
+        Assert.Equal(expected, sim, 6);
+    }
 }

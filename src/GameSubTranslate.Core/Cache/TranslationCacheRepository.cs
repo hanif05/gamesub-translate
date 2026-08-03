@@ -54,4 +54,73 @@ public sealed class TranslationCacheRepository
             "DELETE FROM TranslationCache WHERE CreatedAt < @Cutoff",
             new { Cutoff = cutoff.ToString("o") });
     }
+
+    /// <summary>
+    /// T37: scan recent cache rows for this target lang and return the entry whose
+    /// SourceText is closest to <paramref name="sourceText"/> by normalized Levenshtein
+    /// distance, provided the similarity is at least <paramref name="similarityThreshold"/>.
+    /// Returns null if no row clears the bar. Recent is bounded by <paramref name="maxScanRows"/>
+    /// (default 500) ordered by CreatedAt DESC — keeps the scan cheap as the cache grows.
+    /// </summary>
+    public (string translated, double similarity)? GetFuzzy(
+        string sourceText, string targetLang, double similarityThreshold = 0.85, int maxScanRows = 500)
+    {
+        if (string.IsNullOrEmpty(sourceText)) return null;
+
+        using var conn = _db.Open();
+        var rows = conn.Query<(string SourceText, string TranslatedText)>(
+            @"SELECT SourceText, TranslatedText
+              FROM TranslationCache
+              WHERE TargetLang = @TargetLang
+              ORDER BY CreatedAt DESC
+              LIMIT @Limit",
+            new { TargetLang = targetLang, Limit = maxScanRows })
+            .ToList();
+
+        (string Translated, double Sim)? best = null;
+        foreach (var row in rows)
+        {
+            var sim = NormalizedLevenshteinSimilarity(sourceText, row.SourceText);
+            if (sim < similarityThreshold) continue;
+            if (best is null || sim > best.Value.Sim)
+                best = (row.TranslatedText, sim);
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// Normalized Levenshtein similarity: <c>1 - editDistance / max(lenA, lenB)</c>.
+    /// Both empty → 1.0. Either empty (other not) → 0.0. Identical → 1.0.
+    /// Hand-rolled (no NuGet) — T37 ceiling: swap to a BK-tree once cache &gt; ~10k rows.
+    /// </summary>
+    public static double NormalizedLevenshteinSimilarity(string a, string b)
+    {
+        if (a == b) return 1.0;
+        if (a.Length == 0 || b.Length == 0) return 0.0;
+
+        // Standard 2-row DP. O(min(lenA,lenB)) memory, O(lenA*lenB) time — fine for
+        // subtitle-length strings (typically &lt; 200 chars) even with 500-row scans.
+        var s = a.Length <= b.Length ? a : b;
+        var t = a.Length <= b.Length ? b : a;
+        var prev = new int[s.Length + 1];
+        var curr = new int[s.Length + 1];
+        for (int j = 0; j <= s.Length; j++) prev[j] = j;
+
+        for (int i = 1; i <= t.Length; i++)
+        {
+            curr[0] = i;
+            for (int j = 1; j <= s.Length; j++)
+            {
+                int cost = s[j - 1] == t[i - 1] ? 0 : 1;
+                curr[j] = Math.Min(
+                    Math.Min(curr[j - 1] + 1, prev[j] + 1),
+                    prev[j - 1] + cost);
+            }
+            (prev, curr) = (curr, prev);
+        }
+
+        int dist = prev[s.Length];
+        int maxLen = Math.Max(a.Length, b.Length);
+        return 1.0 - (double)dist / maxLen;
+    }
 }
