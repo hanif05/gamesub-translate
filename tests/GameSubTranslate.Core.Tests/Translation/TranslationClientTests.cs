@@ -92,10 +92,10 @@ public class TranslationClientTests
     }
 
     [Fact]
-    public async Task TranslateAsync_500AllAttempts_ReturnsNullAfterFourAttempts()
+    public async Task TranslateAsync_500AllAttempts_ThrowsProviderAfterFourAttempts()
     {
-        // 5xx is retryable; after MaxAttempts the client gives up and returns null
-        // (so the pipeline can keep running on the next change without crashing).
+        // 5xx is retryable (Provider); after MaxAttempts the client throws a categorized
+        // exception so the UI can render an actionable hint rather than stay silent.
         var handler = new MockHttpMessageHandler
         {
             Respond = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)
@@ -105,29 +105,45 @@ public class TranslationClientTests
         };
         var client = new TranslationClient(ApiKey, BaseUrl, Model, "en", "id", handler);
 
-        // MaxAttempts = 4 in current impl (1 initial + 3 retries).
-        var result = await client.TranslateAsync("Hi");
+        // MaxAttempts = 4 in this impl (1 initial + 3 retries).
+        var ex = await Assert.ThrowsAsync<TranslationException>(() => client.TranslateAsync("Hi"));
 
-        Assert.Null(result);
+        Assert.Equal(ErrorCategory.Provider, ex.Category);
         Assert.Equal(4, handler.HitCount);
     }
 
     [Fact]
-    public async Task TranslateAsync_InvalidJsonResponse_ReturnsNull()
+    public async Task TranslateAsync_InvalidJsonResponse_ThrowsProvider()
     {
-        // Fase-2 implementation tolerates garbage responses: the deserializer returns
-        // null and the client returns null to the pipeline. Fase 3 T39 will tighten
-        // this into a categorized TranslationException; until then this just pins the
-        // current behavior so a future refactor doesn't crash the pipeline on bad JSON.
+        // T39: malformed JSON from the provider surfaces as a categorized Provider error
+        // (thrown, not swallowed) so the overlay can distinguish it from a healthy empty
+        // subtitle.
         var handler = new MockHttpMessageHandler
         {
             Respond = _ => Task.FromResult(MockHttpMessageHandler.Json("not json {{{"))
         };
         var client = new TranslationClient(ApiKey, BaseUrl, Model, "en", "id", handler);
 
-        var result = await client.TranslateAsync("Hi");
+        var ex = await Assert.ThrowsAsync<TranslationException>(() => client.TranslateAsync("Hi"));
 
-        Assert.Null(result);
+        Assert.Equal(ErrorCategory.Provider, ex.Category);
+    }
+
+    [Fact]
+    public async Task TranslateAsync_NetworkFailure_ThrowsNetworkCategory()
+    {
+        // Simulated connection refused → Network category, retried, surfaces Network after
+        // exhausting attempts.
+        var handler = new MockHttpMessageHandler
+        {
+            Respond = _ => throw new HttpRequestException("connection refused")
+        };
+        var client = new TranslationClient(ApiKey, BaseUrl, Model, "en", "id", handler);
+
+        var ex = await Assert.ThrowsAsync<TranslationException>(() => client.TranslateAsync("Hi"));
+
+        Assert.Equal(ErrorCategory.Network, ex.Category);
+        Assert.Equal(4, handler.HitCount);
     }
 
     [Fact]

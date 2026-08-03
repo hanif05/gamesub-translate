@@ -7,13 +7,36 @@ using System.Text.Json.Serialization;
 
 namespace GameSubTranslate.Translation;
 
+/// <summary>T39: classification of a translation failure so the UI can show an actionable hint.</summary>
+public enum ErrorCategory
+{
+    Network,     // timeout, DNS, connection refused
+    Auth,        // 401, 403 — bad key / insufficient scope
+    RateLimit,   // 429 — provider limiting
+    BadRequest,  // 400, 422 — malformed request / bad params
+    Provider,    // 5xx or malformed response — provider-side fault
+    Unknown,
+}
+
 /// <summary>
-/// Non-retryable translation failure (HTTP 400/401/403 etc.) — caller should surface to UI, not retry.
+/// Translation failure with a <see cref="ErrorCategory"/>. Callers surface a category-specific
+/// hint (auth vs rate-limit vs network) instead of a generic message. Retryable categories
+/// (Network, RateLimit, Provider) are retried by <see cref="TranslationClient"/>; Auth and
+/// BadRequest are fatal and surface immediately.
 /// </summary>
 public sealed class TranslationException : Exception
 {
-    public TranslationException(string message) : base(message) { }
-    public TranslationException(string message, Exception inner) : base(message, inner) { }
+    public TranslationException(string message, ErrorCategory category = ErrorCategory.Unknown,
+        Exception? inner = null) : base(message, inner)
+        => Category = category;
+
+    public TranslationException(string message, Exception inner) : base(message, inner)
+        => Category = ErrorCategory.Unknown;
+
+    public ErrorCategory Category { get; }
+
+    public bool Retryable =>
+        Category is ErrorCategory.Network or ErrorCategory.RateLimit or ErrorCategory.Provider;
 }
 
 public class TranslationClient
@@ -49,16 +72,19 @@ public class TranslationClient
         if (string.IsNullOrWhiteSpace(text)) return text;
         if (!IsConfigured) return null;
 
-        // Retry loop: 429 & 5xx retryable, other 4xx fatal, timeout retryable, caller-cancel rethrow.
+        // Retry loop: retryable categories (429, 5xx, network/timeout) retry with backoff;
+        // Auth/BadRequest are fatal and surface immediately; caller-cancel rethrows.
+        TranslationException? last = null;
         for (int attempt = 1; ; attempt++)
         {
             try
             {
                 return await TranslateOnceAsync(text, ct);
             }
-            catch (TranslationException)
+            catch (TranslationException ex)
             {
-                throw; // non-retryable
+                if (!ex.Retryable) throw;
+                last = ex; // retryable — fall through to the backoff below
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -66,17 +92,26 @@ public class TranslationClient
             }
             catch (OperationCanceledException)
             {
-                // HttpClient.Timeout fired — retryable.
+                // HttpClient.Timeout fired — network category, retryable.
+                last = new TranslationException("Translation request timed out", ErrorCategory.Network);
             }
-            catch (Exception)
+            catch (HttpRequestException ex)
             {
-                // Network failure / 429 / 5xx — retryable.
+                // DNS / connection refused / TLS — network category, retryable.
+                last = new TranslationException($"Translation request failed: {ex.Message}", ErrorCategory.Network, ex);
+            }
+            catch (Exception ex)
+            {
+                last = new TranslationException($"Translation failed: {ex.Message}", ErrorCategory.Unknown, ex);
             }
 
             if (attempt >= MaxAttempts)
             {
-                Console.Error.WriteLine($"[translate-error] translation failed after {MaxAttempts} attempts (incl. 3 retries); text skipped");
-                return null;
+                Console.Error.WriteLine($"[translate-error] failed after {MaxAttempts} attempts: {last?.Message}");
+                // T39: surface a categorized error (thrown, not swallowed) so the overlay can
+                // render an actionable hint instead of staying silently empty.
+                throw new TranslationException(
+                    $"Translation failed after {MaxAttempts} attempts", last?.Category ?? ErrorCategory.Unknown, last);
             }
             await Task.Delay(TimeSpan.FromSeconds(1 << (attempt - 1)), ct); // 1s, 2s, 4s
         }
@@ -215,6 +250,26 @@ public class TranslationClient
         }
     }
 
+    /// <summary>T39: map an HTTP status to a categorized exception. 401/403 → Auth, 429 → RateLimit,
+    /// 400/422 → BadRequest, 5xx → Provider, else Unknown.</summary>
+    private static TranslationException TranslateStatusException(HttpResponseMessage resp)
+    {
+        var code = (int)resp.StatusCode;
+        ErrorCategory cat = code switch
+        {
+            401 or 403 => ErrorCategory.Auth,
+            429 => ErrorCategory.RateLimit,
+            400 or 404 or 422 => ErrorCategory.BadRequest,
+            >= 500 => ErrorCategory.Provider,
+            _ => ErrorCategory.Unknown,
+        };
+        return new TranslationException(
+            $"Translation API returned {code} {resp.ReasonPhrase}".Trim(), cat);
+    }
+
+    private static string GetMediaType(HttpResponseMessage resp)
+        => resp.Content.Headers.ContentType?.MediaType ?? "unknown";
+
     private async Task<string?> TranslateOnceAsync(string text, CancellationToken ct)
     {
         var systemPrompt = $"Kamu adalah mesin penerjemah subtitle game. Terjemahkan teks berikut dari {_sourceLang} ke {_targetLang}. Jawab HANYA dengan hasil terjemahan, tanpa penjelasan tambahan, tanpa tanda kutip.";
@@ -231,14 +286,23 @@ public class TranslationClient
 
         using var resp = await _http.PostAsJsonAsync($"{_baseUrl}/chat/completions", req, ct);
         if (!resp.IsSuccessStatusCode)
-        {
-            if (resp.StatusCode == HttpStatusCode.TooManyRequests || (int)resp.StatusCode >= 500)
-                throw new HttpRequestException($"Translation API returned {(int)resp.StatusCode} {resp.ReasonPhrase}");
-            throw new TranslationException($"Translation API returned {(int)resp.StatusCode} {resp.ReasonPhrase}");
-        }
+            throw TranslateStatusException(resp);
 
-        var body = await resp.Content.ReadFromJsonAsync<ChatResponse>(cancellationToken: ct);
-        return body?.Choices?.FirstOrDefault()?.Message?.Content?.Trim();
+        ChatResponse? body;
+        try
+        {
+            body = await resp.Content.ReadFromJsonAsync<ChatResponse>(cancellationToken: ct);
+        }
+        catch (JsonException ex)
+        {
+            throw new TranslationException(
+                $"Translation API returned invalid JSON ({GetMediaType(resp)}): {ex.Message}",
+                ErrorCategory.Provider, ex);
+        }
+        if (body?.Choices is null || body.Choices.Count == 0)
+            throw new TranslationException(
+                $"Translation API returned a {GetMediaType(resp)} without a content choice", ErrorCategory.Provider);
+        return body.Choices[0]?.Message?.Content?.Trim();
     }
 
     private sealed class ChatResponse

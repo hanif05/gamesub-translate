@@ -44,6 +44,14 @@ public partial class App : System.Windows.Application
 
         InitTray();
 
+        // T39: mirror categorized translation errors onto the tray icon tooltip, so a broken
+        // API key is visible even when overlays are hidden mid-game.
+        _main.ErrorReported += msg => Dispatcher.Invoke(() =>
+        {
+            if (_tray is not null)
+                _tray.ToolTipText = "Translation error: " + msg;
+        });
+
         // T25: auto-load profile when a matching game window comes to the foreground.
         _fgWatcher = new ForegroundWatcher(
             foreground: ForegroundWatcher.GetForegroundExe,

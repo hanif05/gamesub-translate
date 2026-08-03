@@ -263,16 +263,25 @@ public partial class MainWindow : Window
             onStreamEnd: () => Dispatcher.Invoke(() => _overlay?.EndStream()));
 
         // T26 scenario 10: surface pipeline/translation errors on the overlay too, so a dead API
-        // key is visible over the game instead of the overlay silently staying empty.
+        // key is visible over the game instead of the overlay silently staying empty. T39: the
+        // message carries a category (e.g. "[translate-error:auth-error: ...]"), surfaced verbatim
+        // on the overlay and forwarded to the tray tooltip.
         _pipeline.StatusChanged += s => Dispatcher.Invoke(() =>
         {
             if (s.StartsWith("[") && s.EndsWith("]")) return; // started/paused/resumed — not errors
             SetStatus(s);
-            if (s.StartsWith("[translate-error]") || s.StartsWith("[tick-error]"))
+            if (s.StartsWith("[translate-error") || s.StartsWith("[tick-error]"))
+            {
                 _overlay?.ShowText($"⚠ {s}");
+                ErrorReported?.Invoke(s);
+            }
         });
         return _pipeline;
     }
+
+    /// <summary>T39: raised when the pipeline reports a categorized (or tick) error. App wires it
+    /// to the tray tooltip.</summary>
+    public event Action<string>? ErrorReported;
 
     private void SetButtons(bool running, bool paused)
     {

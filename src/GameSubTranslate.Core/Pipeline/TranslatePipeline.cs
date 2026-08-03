@@ -267,13 +267,31 @@ public sealed class TranslatePipeline : IDisposable
         {
             throw; // cancellation propagates out of the loop
         }
+        catch (TranslationException ex)
+        {
+            // T39: categorized — render an actionable hint, not a generic message.
+            LastError = $"[translate-error:{Category(ex.Category)}] {ex.Message}";
+            StatusChanged?.Invoke(LastError);
+            return null;
+        }
         catch (Exception ex)
         {
-            LastError = $"[translate-error] {ex.Message}";
+            LastError = $"[translate-error:unknown] {ex.Message}";
             StatusChanged?.Invoke(LastError);
             return null;
         }
     }
+
+    /// <summary>T39: user-facing hint for each error category.</summary>
+    private static string Category(ErrorCategory c) => c switch
+    {
+        ErrorCategory.Auth => "auth-error: cek API key di Settings",
+        ErrorCategory.RateLimit => "rate-limit: provider limiting, tunggu lalu retry",
+        ErrorCategory.Network => "network: cek koneksi internet",
+        ErrorCategory.BadRequest => "bad-request: periksa konfigurasi provider",
+        ErrorCategory.Provider => "provider: server translation error",
+        _ => "unknown",
+    };
 
     /// <summary>
     /// T37: exact-match first, then fuzzy by Levenshtein against recent cache rows. Returns
@@ -342,10 +360,17 @@ public sealed class TranslatePipeline : IDisposable
         {
             throw;
         }
+        catch (TranslationException ex)
+        {
+            _onStreamEnd?.Invoke();
+            LastError = $"[translate-error:{Category(ex.Category)}] {ex.Message}";
+            StatusChanged?.Invoke(LastError);
+            return null;
+        }
         catch (Exception ex)
         {
             _onStreamEnd?.Invoke();
-            LastError = $"[translate-error] {ex.Message}";
+            LastError = $"[translate-error:unknown] {ex.Message}";
             StatusChanged?.Invoke(LastError);
             return null;
         }
