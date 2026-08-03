@@ -14,6 +14,16 @@ public sealed class AppSettings
     public string SourceLang { get; set; } = "auto";
     public string TargetLang { get; set; } = "id";
     public int CaptureIntervalMs { get; set; } = 800;
+
+    // T33: adaptive capture interval. After IdleActivationThreshold frames with no change,
+    // the loop backs off to IdleCaptureIntervalMs (default 3000) to save CPU while the
+    // subtitle is still. Any change resets to CaptureIntervalMs.
+    public int IdleCaptureIntervalMs { get; set; } = 3000;
+    public int IdleActivationThreshold { get; set; } = 3;
+    // Window in ms before idle mode engages even if threshold isn't met — keeps the loop
+    // responsive when frames are technically different (anti-aliasing jitter) but semantically idle.
+    public int IdleActivationWindowMs { get; set; } = 5000;
+
     public OcrEngineKind OcrEngine { get; set; } = OcrEngineKind.Tesseract;
     public string OverlayFontFamily { get; set; } = "Segoe UI";
     public double OverlayFontSize { get; set; } = 20;

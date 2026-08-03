@@ -26,6 +26,9 @@ public sealed class TranslatePipeline : IDisposable
     private readonly TranslationCacheRepository? _cache;
     private readonly Action<string> _onTranslated;
     private readonly int _x, _y, _w, _h, _intervalMs;
+    private readonly int _idleIntervalMs;
+    private readonly int _idleThreshold;
+    private readonly int _idleWindowMs;
 
     private readonly object _sync = new();
     // Serializes access to the WGC capture source: the capture instance is not thread-safe
@@ -38,6 +41,9 @@ public sealed class TranslatePipeline : IDisposable
     private volatile bool _running;
     private byte[]? _lastPng;
     private string? _lastText;
+    // T33: idle tracking — consecutive unchanged frames + wall-clock of last change.
+    private int _unchangedCount;
+    private DateTime _lastChangeAt = DateTime.UtcNow;
 
     /// <summary>Raised on state changes ("started", "paused", errors…). May fire off the UI thread.</summary>
     public event Action<string>? StatusChanged;
@@ -49,25 +55,31 @@ public sealed class TranslatePipeline : IDisposable
 
     public TranslatePipeline(IScreenCapture capture, IOcrEngine ocr, TranslationClient? translator,
         TranslationCacheRepository? cache, int x, int y, int w, int h, int intervalMs,
-        Action<string> onTranslated)
+        Action<string> onTranslated,
+        int idleIntervalMs = 3000, int idleThreshold = 3, int idleWindowMs = 5000)
     {
         _capture = capture;
         _ocr = ocr;
         _translator = translator;
         _cache = cache;
         _x = x; _y = y; _w = w; _h = h; _intervalMs = intervalMs;
+        _idleIntervalMs = idleIntervalMs;
+        _idleThreshold = idleThreshold;
+        _idleWindowMs = idleWindowMs;
         _onTranslated = onTranslated;
     }
 
     /// <summary>Builds a pipeline over the real WGC capture for the monitor containing (x,y).</summary>
     public static TranslatePipeline ForEnvironment(int x, int y, int w, int h, int intervalMs,
-        IOcrEngine ocr, AppConfig cfg, TranslationCacheRepository? cache, Action<string> onTranslated)
+        IOcrEngine ocr, AppConfig cfg, TranslationCacheRepository? cache, Action<string> onTranslated,
+        int idleIntervalMs = 3000, int idleThreshold = 3, int idleWindowMs = 5000)
     {
         TranslationClient? translator = null;
         if (cfg.TranslationEnabled)
             translator = new TranslationClient(cfg.ApiKey!, cfg.BaseUrl!, cfg.Model!, cfg.SourceLang, cfg.TargetLang);
         return new TranslatePipeline(ScreenCapture.ForMonitorAt(x, y), ocr, translator, cache,
-            x, y, w, h, intervalMs, onTranslated);
+            x, y, w, h, intervalMs, onTranslated,
+            idleIntervalMs, idleThreshold, idleWindowMs);
     }
 
     public void Start()
@@ -165,24 +177,36 @@ public sealed class TranslatePipeline : IDisposable
             {
                 if (_paused)
                 {
-                    // Keep the newest frame available so resume compares against the latest
-                    // subtitle state — no backlog, no burst of API calls.
-                    byte[] pausedFrame = await CaptureLockedAsync(ct);
-                    if (pausedFrame.Length > 0) _lastPng = pausedFrame;
+                    // T33: paused = zero work. Capture itself is the most expensive step
+                    // (full screen read + PNG encode); skip it entirely. Resume() will
+                    // pick up the next change from the next tick — no backlog, no burst.
+                    // Reset idle tracking so resume doesn't think we're already idle.
+                    _unchangedCount = 0;
+                    _lastChangeAt = DateTime.UtcNow;
                 }
                 else
                 {
                     byte[] png = await CaptureLockedAsync(ct);
-                    if (png.Length > 0 && ChangeDetector.IsChanged(png, _lastPng))
+                    if (png.Length > 0)
                     {
-                        _lastPng = png;
-                        string text = _ocr.Recognize(png);
-                        if (!string.IsNullOrWhiteSpace(text) && text != _lastText)
+                        bool changed = ChangeDetector.IsChanged(png, _lastPng);
+                        if (changed)
                         {
-                            _lastText = text;
-                            string? translated = await TranslateAsync(text, ct);
-                            if (translated is not null)
-                                _onTranslated(translated);
+                            _lastPng = png;
+                            _lastChangeAt = DateTime.UtcNow;
+                            _unchangedCount = 0;
+                            string text = _ocr.Recognize(png);
+                            if (!string.IsNullOrWhiteSpace(text) && text != _lastText)
+                            {
+                                _lastText = text;
+                                string? translated = await TranslateAsync(text, ct);
+                                if (translated is not null)
+                                    _onTranslated(translated);
+                            }
+                        }
+                        else
+                        {
+                            _unchangedCount++;
                         }
                     }
                 }
@@ -197,9 +221,21 @@ public sealed class TranslatePipeline : IDisposable
                 StatusChanged?.Invoke(LastError);
             }
 
-            try { await Task.Delay(_intervalMs, ct); }
+            int delay = CurrentInterval();
+            try { await Task.Delay(delay, ct); }
             catch (OperationCanceledException) { break; }
         }
+    }
+
+    /// <summary>T33: pick interval based on idle state. Normal unless we have enough
+    /// unchanged frames OR enough wall-clock time has passed without a change.</summary>
+    private int CurrentInterval()
+    {
+        if (_paused) return _intervalMs;
+        bool windowElapsed = (DateTime.UtcNow - _lastChangeAt).TotalMilliseconds >= _idleWindowMs;
+        if (_unchangedCount >= _idleThreshold || windowElapsed)
+            return _idleIntervalMs;
+        return _intervalMs;
     }
 
     private async Task<string?> TranslateAsync(string text, CancellationToken ct)
