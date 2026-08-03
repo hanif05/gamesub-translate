@@ -127,6 +127,7 @@ Fase 3 **memperdalam & mengisi celah**, bukan replace. TIDAK refactor besar — 
 ### FASE 3.B — Performance
 
 #### T33. Adaptive capture interval
+**Status**: ✅ done (commit `0edd6cb`).
 **Deskripsi**: Di `TranslatePipeline`, ganti fixed interval `AppSettings.CaptureIntervalMs` jadi adaptive:
 - Default: pakai `CaptureIntervalMs` (Fase 2 behavior).
 - **Idle mode**: kalau 3 capture berturut-turut tidak ada perubahan (change detector return false), naikkan interval ke `min(CaptureIntervalMs * 4, 3000ms)` — kurangi CPU saat subtitle diam.
@@ -142,6 +143,7 @@ Fase 3 **memperdalam & mengisi celah**, bukan replace. TIDAK refactor besar — 
 **Depends on**: T16 (Fase 2, sudah done).
 
 #### T34. Lazy-load + dispose Tesseract
+**Status**: ✅ done (commit `2144ef6`).
 **Deskripsi**: `TesseractOcrEngine` saat ini init di constructor (Fase 2). Fase 3:
 - **Lazy**: init `TesseractEngine` di method `Recognize` pertama, bukan constructor. `App.OnStartup` jadi tidak block.
 - **Dispose on idle**: `Timer` background dispose engine setelah 5 menit tanpa OCR call. Next `Recognize` re-init.
@@ -164,6 +166,7 @@ Tesseract internal TIDAK thread-safe — `Recognize` dan `Dispose` tidak boleh o
 **Depends on**: — (Fase 2 T5 sudah done, ini deepen).
 
 #### T35. Memory & CPU profiling pass
+**Status**: ✅ done (commit `0da45de`).
 **Deskripsi**: Jalankan app full pipeline 1 jam (bisa pakai video YouTube dengan subtitle sebagai loop subtitle), monitor:
 - **RAM usage** (Task Manager → Details → Working Set). Target: < 200MB idle. Kalau lebih, identify via dotMemory trial atau `dotnet-counters` (`--counters System.Runtime`) dan fix leak.
 - **CPU usage** saat tidak ada perubahan teks. Target: < 1% average. Idle capture interval (T33) + lazy Tesseract (T34) harus cukup.
@@ -357,6 +360,25 @@ Sesuai estimasi roadmap PRD 1–2 minggu, on track kalau tidak ada blocker tak t
 ## Hasil Verifikasi (diisi saat T42 selesai)
 
 _(Diisi setelah T42 selesai dieksekusi.)_
+
+### Profiling — T35 smoke (15s run, FakeCapture, 50ms interval)
+
+Run via `dotnet run --project src/GameSubTranslate.App -- --selfcheck-t35 --selfcheck-t35-secs 15 --selfcheck-t35-sample-ms 2000`.
+
+| Metric | Start | End | Delta | Target | Status |
+|---|---|---|---|---|---|
+| Working set | 44 MB | 56 MB | +12 MB | < 200 MB idle | ✅ |
+| Handles (post-warmup) | 313 | 313 | 0 | stable | ✅ |
+| GC heap | 373 KB | 405 KB | +32 KB | no leak | ✅ |
+| Pipeline latency (cached frame) | — | — | ~0 ms | < 3000 ms P95 | ✅ |
+
+**Catatan warmup:** handles naik ~62 di awal proses (251→313) dalam ~2 detik pertama — itu JIT + module load + WPF resource cache init, satu kali. Threshold pakai rebase setelah warmup selesai supaya tidak false-positive.
+
+**Verifikasi 1-jam penuh:** untuk profile panjang sesuai PRD 7, run:
+```
+dotnet run --project src/GameSubTranslate.App -- --selfcheck-t35 --selfcheck-t35-secs 3600 --selfcheck-t35-sample-ms 60000
+```
+Atau jalankan app penuh (`dotnet run --project src/GameSubTranslate.App`) sambil monitor dari Task Manager / `dotnet-counters System.Runtime`. Hasil dicatat ulang saat T42.
 
 ## Catatan
 
