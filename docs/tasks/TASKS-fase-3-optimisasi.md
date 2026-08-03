@@ -183,7 +183,7 @@ Catat hasil di section "Hasil Verifikasi" T42.
 ### FASE 3.C — Translation Quality
 
 #### T36. Streaming translation (SSE)
-**Status**: ✅ done (commit `<pending>`).
+**Status**: ✅ done (commit `60c76fa`).
 **Deskripsi**: Tambah method `IAsyncEnumerable<string> TranslateStreamAsync(string text, CancellationToken ct)` ke `TranslationClient` untuk support streaming response dari endpoint OpenAI-compatible yang support SSE (`stream=true` di body). Pakai `HttpClient.SendAsync` dengan `HttpCompletionOption.ResponseHeadersRead`, baca stream line-by-line (`data: {...}\n\n`), parse JSON per chunk, extract `choices[0].delta.content`.
 
 **⚠ Backward compatibility (PENTING — T30 test suite tidak boleh jadi outdated):**
@@ -206,7 +206,7 @@ Catat hasil di section "Hasil Verifikasi" T42.
 **Depends on**: T12 (Fase 2).
 
 #### T37. Fuzzy cache match
-**Status**: ✅ done (commit `<pending>`).
+**Status**: ✅ done (commit `09911ec`).
 **Deskripsi**: Update `TranslationCacheRepository`:
 - Tambah `GetFuzzy(string sourceText, string targetLang, double similarityThreshold) -> (string translated, double similarity)?`.
 - Similarity: **Normalized Levenshtein distance** (`1 - editDistance / max(lenA, lenB)`), threshold default 0.85.
@@ -222,6 +222,7 @@ Catat hasil di section "Hasil Verifikasi" T42.
 **Depends on**: T13 (Fase 2).
 
 #### T38. Vision AI OCR fallback (pluggable)
+**Status**: ✅ done (commit `6cea253`).
 **Deskripsi**: Tambah `VisionAiOcrEngine` (Core/Ocr/) implementasi `IOcrEngine` pakai OpenAI-compatible vision endpoint.
 
 **⚠ Keputusan interface (PENTING — eksplisit di sini supaya T38 + test T29 tidak ambigu):**
@@ -257,6 +258,7 @@ public interface IOcrEngine {
 **Depends on**: T3 (settings model, Fase 2), T12 (HttpClient + retry, Fase 2).
 
 #### T39. Better error reporting
+**Status**: ✅ done (commit `969e0b4`).
 **Deskripsi**: Categorize `TranslationException`:
 - `Category` enum: `Network` (timeout, DNS, connection refused), `Auth` (401, 403), `RateLimit` (429), `BadRequest` (400, invalid params), `Provider` (5xx, model error), `Unknown`.
 - `TranslationClient` set category berdasarkan HTTP status + exception type.
