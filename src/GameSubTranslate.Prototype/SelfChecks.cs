@@ -510,7 +510,9 @@ internal static class SelfChecks
         private readonly FakeCapture _cap;
         public int Calls;
         public FakeOcr(FakeCapture cap) => _cap = cap;
-        public string Recognize(byte[] pngBytes) { Calls++; return _cap.CurrentText(); }
+        public Task<string> RecognizeAsync(byte[] pngBytes, CancellationToken ct = default)
+        { Calls++; return Task.FromResult(_cap.CurrentText()); }
+        public void Dispose() { }
     }
 
     /// <summary>Passthrough translator with an attempt counter, so pipeline-translate calls are observable.</summary>

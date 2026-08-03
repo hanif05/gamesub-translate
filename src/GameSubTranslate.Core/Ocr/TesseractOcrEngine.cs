@@ -54,12 +54,23 @@ public sealed class TesseractOcrEngine : IOcrEngine, IDisposable
             dueTime: Timeout.Infinite, period: Timeout.Infinite);
     }
 
-    public string Recognize(byte[] pngBytes)
+    public Task<string> RecognizeAsync(byte[] pngBytes, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        // Tesseract's engine is synchronous + native and blocks the calling thread
+        // (~300ms first call, less after). Run it on the thread pool so the pipeline's
+        // callers (which may be on the WPF UI thread) never block.
+        return Task.Run(() => RecognizeSync(pngBytes), ct);
+    }
+
+    /// <summary>Synchronous, blocking OCR call. Thread-safe via _gate. T38: kept as the
+    /// private core that <see cref="RecognizeAsync"/> schedules on a thread-pool thread.</summary>
+    private string RecognizeSync(byte[] pngBytes)
     {
         // Fast-path read of the field without locking — if engine exists, we still
         // enter the gate for the actual Recognize call (Tesseract internal state is
-        // not thread-safe), but we avoid the async wait for the common "engine already
-        // up" case by doing the lazy-init inside the lock below.
+        // not thread-safe), but we avoid the "engine already up" case's blocking wait
+        // by doing the lazy-init inside the lock below.
         _gate.Wait();
         try
         {

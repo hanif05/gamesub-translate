@@ -247,7 +247,9 @@ public partial class MainWindow : Window
         };
         if (!cfg.TranslationEnabled) { SetStatus("Translation not configured — set API key in Settings."); return null; }
 
-        var ocr = new TesseractOcrEngine();
+        // T38: engine chosen from settings (Tesseract vs Vision AI). VisionAI needs a
+        // configured provider; factory falls back to Tesseract if that's missing.
+        var ocr = OcrEngineFactory.Create(_settings.OcrEngine, cfg);
         _pipeline = TranslatePipeline.ForEnvironment(
             region.X, region.Y, region.Width, region.Height, _settings.CaptureIntervalMs,
             ocr, cfg, cache: new TranslationCacheRepository(_db),

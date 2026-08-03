@@ -151,7 +151,7 @@ public sealed class TranslatePipeline : IDisposable
         byte[] png = await CaptureLockedAsync(ct);
         if (png.Length == 0) return null;
         _lastPng = png;
-        string text = _ocr.Recognize(png);
+        string text = await _ocr.RecognizeAsync(png, ct);
         if (string.IsNullOrWhiteSpace(text)) return null;
         _lastText = text;
         string? translated = await TranslateAsync(text, ct);
@@ -206,7 +206,7 @@ public sealed class TranslatePipeline : IDisposable
                             _lastPng = png;
                             _lastChangeAt = DateTime.UtcNow;
                             _unchangedCount = 0;
-                            string text = _ocr.Recognize(png);
+                            string text = await _ocr.RecognizeAsync(png, ct);
                             if (!string.IsNullOrWhiteSpace(text) && text != _lastText)
                             {
                                 _lastText = text;

@@ -470,7 +470,9 @@ internal static class SelfChecks
     {
         private readonly FakeCapture _cap;
         public FakeOcr(FakeCapture cap) => _cap = cap;
-        public string Recognize(byte[] pngBytes) => _cap.CurrentText();
+        public Task<string> RecognizeAsync(byte[] pngBytes, CancellationToken ct = default)
+            => Task.FromResult(_cap.CurrentText());
+        public void Dispose() { }
     }
 
     private sealed class FakeTranslator : TranslationClient

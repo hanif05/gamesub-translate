@@ -65,7 +65,7 @@
                     <TextBlock Text="OCR engine" FontWeight="SemiBold"/>
                     <ComboBox x:Name="OcrEngineBox" Margin="0,4,0,0" Width="160" HorizontalAlignment="Left">
                         <ComboBoxItem Content="Tesseract" Tag="Tesseract"/>
-                        <ComboBoxItem Content="Vision AI (coming soon)" Tag="VisionAi" IsEnabled="False"/>
+                        <ComboBoxItem Content="Vision AI" Tag="VisionAi"/>
                     </ComboBox>
                 </StackPanel>
             </TabItem>

@@ -22,7 +22,7 @@ public class TesseractOcrEngineTests
     }
 
     [Fact]
-    public void Recognize_TessdataMissing_ThrowsOcrEngineLoadException()
+    public async Task Recognize_TessdataMissing_ThrowsOcrEngineLoadException()
     {
         var bogus = Path.Combine(Path.GetTempPath(), "definitely-not-here-" + Guid.NewGuid().ToString("N"));
         using var engine = new TesseractOcrEngine(bogus);
@@ -31,7 +31,8 @@ public class TesseractOcrEngineTests
         // ctor fails first, but Pix.LoadFromMemory needs a valid byte[] shape to not
         // itself throw before our lazy-init. Empty byte[] would bypass Tesseract's
         // own format check too early.
-        var ex = Assert.Throws<OcrEngineLoadException>(() => engine.Recognize(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0 }));
+        var ex = await Assert.ThrowsAsync<OcrEngineLoadException>(
+            () => engine.RecognizeAsync(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0 }));
         Assert.Contains("traineddata", ex.Message);
         Assert.NotNull(ex.InnerException);
     }
@@ -47,12 +48,12 @@ public class TesseractOcrEngineTests
     }
 
     [Fact]
-    public void Dispose_AfterRecognizeAttempt_StillCleansUp()
+    public async Task Dispose_AfterRecognizeAttempt_StillCleansUp()
     {
         var bogus = Path.Combine(Path.GetTempPath(), "nope-" + Guid.NewGuid().ToString("N"));
         var engine = new TesseractOcrEngine(bogus);
 
-        try { engine.Recognize(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0 }); }
+        try { await engine.RecognizeAsync(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0 }); }
         catch (OcrEngineLoadException) { /* expected — tessdata missing */ }
 
         // Even though lazy-init failed (engine still null), Dispose must work cleanly.
@@ -72,12 +73,12 @@ public class TesseractOcrEngineTests
         var engine = new TesseractOcrEngine(bogus, idleDisposeAfter: TimeSpan.FromMilliseconds(50));
 
         using var startSignal = new ManualResetEventSlim(false);
-        var tasks = Enumerable.Range(0, 100).Select(i => Task.Run(() =>
+        var tasks = Enumerable.Range(0, 100).Select(i => Task.Run(async () =>
         {
             startSignal.Wait();
             try
             {
-                engine.Recognize(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0 });
+                await engine.RecognizeAsync(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0 });
             }
             catch (OcrEngineLoadException) { /* expected */ }
             catch (ObjectDisposedException) { /* acceptable: Dispose won the race */ }
