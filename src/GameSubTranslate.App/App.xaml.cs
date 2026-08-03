@@ -5,6 +5,7 @@ using GameSubTranslate.App.Overlay;
 using GameSubTranslate.App.Settings;
 using GameSubTranslate.Config;
 using GameSubTranslate.Hotkeys;
+using GameSubTranslate.Logging;
 using GameSubTranslate.Profiles;
 using GameSubTranslate.Storage;
 using Hardcodet.Wpf.TaskbarNotification;
@@ -21,6 +22,7 @@ public partial class App : System.Windows.Application
     private TaskbarIcon? _tray;
     private ForegroundWatcher? _fgWatcher;
     private AppSettings _settings = new();
+    private FileLogger _logger = new();
 
     protected override void OnStartup(System.Windows.StartupEventArgs e)
     {
@@ -35,6 +37,7 @@ public partial class App : System.Windows.Application
         }
 
         _settings = new SettingsStore().Load();
+        _logger.Info("App", $"starting (settings at {new SettingsStore().FilePath})");
         _overlay = new OverlayWindow(_settings);
         _overlay.ShowOverlay(); // T14: overlay is visible (transparent) from launch; hotkey hides it.
         _main = new MainWindow(new Database(), null, _overlay);
@@ -50,6 +53,7 @@ public partial class App : System.Windows.Application
         {
             if (_tray is not null)
                 _tray.ToolTipText = "Translation error: " + msg;
+            _logger.Error("Pipeline", msg);
         });
 
         // T25: auto-load profile when a matching game window comes to the foreground.
@@ -187,6 +191,7 @@ public partial class App : System.Windows.Application
     private void ReloadSettings()
     {
         _settings = new SettingsStore().Load();
+        _logger.Info("Settings", "settings saved — reloaded");
         _overlay?.ApplySettings(_settings);
         _main?.ReloadSettings(_settings);
         RegisterHotkeys(_settings);
@@ -197,10 +202,12 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _logger.Info("App", "shutting down");
         _fgWatcher?.Dispose();
         _hotkeys?.Dispose();
         _main?.Dispose();
         _tray?.Dispose();
+        _logger.Dispose();
         base.OnExit(e);
     }
 }

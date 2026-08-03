@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -122,6 +123,22 @@ public partial class SettingsWindow : Window
     }
 
     private ProviderConfig? SelectedProvider => ProviderList.SelectedItem as ProviderConfig;
+
+    // ---- About / Logs ----
+
+    private void OpenLogsFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "GameSubTranslate", "logs");
+        Directory.CreateDirectory(dir);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "explorer.exe",
+            Arguments = dir,
+            UseShellExecute = true,
+        });
+    }
 
     // ---- API & Model ----
 
