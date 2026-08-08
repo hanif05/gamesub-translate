@@ -62,6 +62,12 @@ public partial class SettingsWindow : Window
 
         FontSizeSlider.ValueChanged += (_, _) => FontSizeText.Text = FontSizeSlider.Value.ToString("0");
         OpacitySlider.ValueChanged += (_, _) => OpacityText.Text = OpacitySlider.Value.ToString("0.00");
+
+        // T44: About tab reads version from version.txt next to the exe (shipped by csproj).
+        // Fall back to a single dash on dev runs that pre-date T44.
+        var versionFile = Path.Combine(AppContext.BaseDirectory, "version.txt");
+        var version = File.Exists(versionFile) ? File.ReadAllText(versionFile).Trim() : "-";
+        AboutVersion.Text = $"Version {version}";
     }
 
     private void LoadSettings()
