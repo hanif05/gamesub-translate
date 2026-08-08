@@ -2,6 +2,7 @@ using System.Diagnostics;
 using GameSubTranslate.Cache;
 using GameSubTranslate.Capture;
 using GameSubTranslate.Config;
+using GameSubTranslate.Logging;
 using GameSubTranslate.Ocr;
 using GameSubTranslate.Translation;
 
@@ -30,6 +31,10 @@ public sealed class TranslatePipeline : IDisposable
     private readonly Action<string>? _onToken;
     private readonly Action? _onStreamStart;
     private readonly Action? _onStreamEnd;
+    // Optional diagnostic logger. When set, pipeline writes OCR delta + translate in/out +
+    // cache hit/miss to FileLogger so an operator can replay a noisy run. Null → no logging
+    // (keeps the existing tests + callers quiet).
+    private readonly FileLogger? _logger;
     private readonly int _x, _y, _w, _h, _intervalMs;
     private readonly int _idleIntervalMs;
     private readonly int _idleThreshold;
@@ -66,6 +71,7 @@ public sealed class TranslatePipeline : IDisposable
         TranslationCacheRepository? cache, int x, int y, int w, int h, int intervalMs,
         Action<string> onTranslated,
         Action<string>? onToken = null, Action? onStreamStart = null, Action? onStreamEnd = null,
+        FileLogger? logger = null,
         int idleIntervalMs = 3000, int idleThreshold = 3, int idleWindowMs = 5000)
     {
         _capture = capture;
@@ -80,12 +86,14 @@ public sealed class TranslatePipeline : IDisposable
         _onToken = onToken;
         _onStreamStart = onStreamStart;
         _onStreamEnd = onStreamEnd;
+        _logger = logger;
     }
 
     /// <summary>Builds a pipeline over the real WGC capture for the monitor containing (x,y).</summary>
     public static TranslatePipeline ForEnvironment(int x, int y, int w, int h, int intervalMs,
         IOcrEngine ocr, AppConfig cfg, TranslationCacheRepository? cache, Action<string> onTranslated,
         Action<string>? onToken = null, Action? onStreamStart = null, Action? onStreamEnd = null,
+        FileLogger? logger = null,
         int idleIntervalMs = 3000, int idleThreshold = 3, int idleWindowMs = 5000)
     {
         TranslationClient? translator = null;
@@ -95,6 +103,7 @@ public sealed class TranslatePipeline : IDisposable
         var pipeline = new TranslatePipeline(ScreenCapture.ForMonitorAt(x, y), ocr, translator, cache,
             x, y, w, h, intervalMs, onTranslated,
             onToken, onStreamStart, onStreamEnd,
+            logger,
             idleIntervalMs, idleThreshold, idleWindowMs);
         // T40: hop events bubble out so the app can flag "degraded" on the overlay.
         if (translator is not null)
@@ -219,7 +228,16 @@ public sealed class TranslatePipeline : IDisposable
                             if (!string.IsNullOrWhiteSpace(text) && text != _lastText)
                             {
                                 _lastText = text;
+                                _logger?.Info("OCR", $"recognize text=\"{Truncate(text, 120)}\"");
                                 await TranslateAndShowAsync(text, ct);
+                            }
+                            else if (!string.IsNullOrWhiteSpace(text))
+                            {
+                                _logger?.Info("OCR", $"skip (same as last) text=\"{Truncate(text, 120)}\"");
+                            }
+                            else
+                            {
+                                _logger?.Info("OCR", "skip (empty/whitespace)");
                             }
                         }
                         else
@@ -265,9 +283,11 @@ public sealed class TranslatePipeline : IDisposable
 
             // T26 scenario 8: end-to-end latency from subtitle change to translated output.
             var sw = Stopwatch.StartNew();
+            _logger?.Info("Translate", $"request (single-shot) src=\"{Truncate(text, 120)}\"");
             string? translated = LookupCached(text) ?? await _translator.TranslateAsync(text, ct);
             sw.Stop();
             Console.WriteLine($"[latency] {sw.Elapsed.TotalMilliseconds:F0}ms \"{text}\" -> \"{translated}\"");
+            _logger?.Info("Translate", $"done {sw.Elapsed.TotalMilliseconds:F0}ms src=\"{Truncate(text, 80)}\" -> \"{Truncate(translated, 80)}\"");
             if (translated is not null && _cache is not null)
                 _cache.Put(text, translated, _translator.TargetLang);
             return translated;
@@ -311,11 +331,15 @@ public sealed class TranslatePipeline : IDisposable
     {
         if (_cache is null || _translator is null) return null;
         var exact = _cache.Get(text, _translator.TargetLang);
-        if (exact is not null) return exact;
+        if (exact is not null)
+        {
+            _logger?.Info("Cache", $"exact hit text=\"{Truncate(text, 80)}\"");
+            return exact;
+        }
         var fuzzy = _cache.GetFuzzy(text, _translator.TargetLang);
         if (fuzzy is { } f)
         {
-            Console.WriteLine($"[cache-fuzzy] similarity={f.similarity:F2} \"{text}\" -> \"{f.translated}\"");
+            _logger?.Info("Cache", $"fuzzy hit sim={f.similarity:F2} text=\"{Truncate(text, 80)}\" -> \"{Truncate(f.translated, 80)}\"");
             return f.translated;
         }
         return null;
@@ -354,6 +378,7 @@ public sealed class TranslatePipeline : IDisposable
         var sw = Stopwatch.StartNew();
         var buffer = new System.Text.StringBuilder();
         DateTime firstTokenAt = default;
+        _logger?.Info("Translate", $"request (stream) src=\"{Truncate(text, 120)}\"");
         try
         {
             _onStreamStart?.Invoke();
@@ -401,5 +426,14 @@ public sealed class TranslatePipeline : IDisposable
             if (_cache is not null) _cache.Put(text, full, _translator.TargetLang);
         }
         return full.Length > 0 ? full : null;
+    }
+
+    /// <summary>Truncate text for log lines so a 200-char subtitle doesn't blow up the log.
+    /// Adds "..." when truncated.</summary>
+    private static string Truncate(string? s, int max)
+    {
+        if (s is null) return "";
+        if (s.Length <= max) return s;
+        return s[..max] + "...";
     }
 }

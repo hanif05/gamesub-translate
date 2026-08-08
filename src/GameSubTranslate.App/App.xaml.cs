@@ -87,7 +87,7 @@ public partial class App : System.Windows.Application
 
         _overlay = new OverlayWindow(_settings);
         _overlay.ShowOverlay(); // T14: overlay is visible (transparent) from launch; hotkey hides it.
-        _main = new MainWindow(new Database(), null, _overlay);
+        _main = new MainWindow(new Database(), null, _overlay, _logger);
 
         if (wizardSkipped)
         {

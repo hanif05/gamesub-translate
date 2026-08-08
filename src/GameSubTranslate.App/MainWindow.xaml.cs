@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using GameSubTranslate.App.Profiles;
 using GameSubTranslate.Cache;
 using GameSubTranslate.Config;
+using GameSubTranslate.Logging;
 using GameSubTranslate.Ocr;
 using GameSubTranslate.Pipeline;
 using GameSubTranslate.Profiles;
@@ -19,12 +20,14 @@ public partial class MainWindow : Window
     private readonly SettingsStore _settingsStore;
     private readonly AppSettings _settings;
     private readonly Overlay.OverlayWindow? _overlay;
+    private readonly FileLogger? _logger;
     private TranslatePipeline? _pipeline;
     private bool _updating; // guard against event feedback during Refresh
 
-    public MainWindow() : this(new Database(), null, null) { }
+    public MainWindow() : this(new Database(), null, null, null) { }
 
-    public MainWindow(Database db, Window? owner, Overlay.OverlayWindow? overlay = null)
+    public MainWindow(Database db, Window? owner, Overlay.OverlayWindow? overlay = null,
+        GameSubTranslate.Logging.FileLogger? logger = null)
     {
         InitializeComponent();
         _db = db;
@@ -32,6 +35,7 @@ public partial class MainWindow : Window
         _repo = new ProfileRepository(db);
         _settingsStore = new SettingsStore();
         _settings = _settingsStore.Load();
+        _logger = logger;
         _service = new ProfileService(_repo, _settingsStore, _settings);
         _overlay = overlay;
         if (owner is not null) Owner = owner;
@@ -290,7 +294,8 @@ public partial class MainWindow : Window
             }),
             onToken: token => Dispatcher.Invoke(() => _overlay?.AppendToken(token)),
             onStreamStart: () => Dispatcher.Invoke(() => _overlay?.BeginStream()),
-            onStreamEnd: () => Dispatcher.Invoke(() => _overlay?.EndStream()));
+            onStreamEnd: () => Dispatcher.Invoke(() => _overlay?.EndStream()),
+            logger: _logger);
 
         // T26 scenario 10: surface pipeline/translation errors on the overlay too, so a dead API
         // key is visible over the game instead of the overlay silently staying empty. T39: the
