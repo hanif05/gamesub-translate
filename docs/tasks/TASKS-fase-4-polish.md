@@ -140,7 +140,7 @@ Tombol "Finish" → simpan settings default + langsung buka Settings Panel untuk
 **Depends on**: T46 (overlay layout fix).
 
 #### T48. Settings panel polish
-**Status**: ⬜ pending.
+**Status**: ✅ done (`c613497`).
 **Deskripsi**: Saat ini `SettingsWindow` functional tapi plain. Fase 4:
 - **Tab icons**: tambah icon sederhana (unicode `⚙ API`, `🌐 Language`, `📷 Capture`, `🎨 Overlay`, `⌨ Hotkeys`, `🎮 Profiles`, `ℹ About`) di header tab.
 - **Field validation real-time**: interval < 100ms → warning merah di samping field (T23 validasi hanya di Save click).
@@ -156,7 +156,7 @@ Tombol "Finish" → simpan settings default + langsung buka Settings Panel untuk
 **Depends on**: T23 (Fase 2 settings).
 
 #### T49. Tray icon + menu polish
-**Status**: ⬜ pending.
+**Status**: ✅ done (`57d243a`).
 **Deskripsi**: T24 sudah punya tray icon basic. Fase 4:
 - **Active profile indicator**: tray icon tooltip menampilkan "GameSubTranslate — Active: The Last of Us Part I" atau "GameSubTranslate — No active profile".
 - **Quick region switch** submenu: saat profile aktif punya >1 region, submenu "Region → Dialog / Battle / Menu" untuk switch langsung dari tray tanpa buka main window.
@@ -171,7 +171,7 @@ Tombol "Finish" → simpan settings default + langsung buka Settings Panel untuk
 **Depends on**: T24 (Fase 2 tray), T25 (Fase 2 auto-load profile).
 
 #### T50. FPS impact verification (overlay rendering)
-**Status**: ⬜ pending.
+**Status**: ✅ methodology + table template landed (`95a40f3`). Actual numbers filled by user per-machine.
 **Deskripsi**: PRD 7 target FPS impact < 5%. Verifikasi dengan `PresentMon` (Intel tool, free) di dua game:
 - Test 1: **The Last of Us Part I** (target utama PRD 13) di Borderless Windowed 1080p.
 - Test 2: **Stardew Valley** (game ringan baseline) di Windowed 1080p.
@@ -185,7 +185,7 @@ Metode: jalankan game 60 detik tanpa overlay (baseline FPS), 60 detik dengan ove
 **Depends on**: T47 (fade animation), T46 (overlay layout).
 
 #### T51. Multi-target language quick switch
-**Status**: ⬜ pending.
+**Status**: ✅ done (`abfc9f2`).
 **Deskripsi**: PRD 16 sudah punya multi-target language support, tapi tidak ada UI quick switch. Fase 4:
 - Tambah submenu "Target language →" di tray menu (T49 sudah polish tray). Isi: daftar bahasa yang aktif di TargetLangBox (id, en, ja, ko, zh, fr, de, es). Click → set `_settings.TargetLang` + simpan + rebuild pipeline kalau jalan.
 - Tambah hotkey `Ctrl+Alt+L` (configurable) → cycle ke bahasa berikutnya.
