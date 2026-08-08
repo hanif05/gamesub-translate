@@ -54,6 +54,7 @@ public sealed class SettingsStore
                 ActiveProfileId = dto.ActiveProfileId,
                 ActiveRegionId = dto.ActiveRegionId,
                 Providers = dto.Providers ?? new(),
+                SetupCompleted = dto.SetupCompleted,
             };
         }
         catch
@@ -91,6 +92,7 @@ public sealed class SettingsStore
             ActiveProfileId = s.ActiveProfileId,
             ActiveRegionId = s.ActiveRegionId,
             Providers = s.Providers,
+            SetupCompleted = s.SetupCompleted,
         };
 
         File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, JsonOpts));
@@ -141,5 +143,6 @@ public sealed class SettingsStore
         public int? ActiveProfileId { get; set; }
         public int? ActiveRegionId { get; set; }
         public List<ProviderConfig>? Providers { get; set; }
+        public bool SetupCompleted { get; set; }
     }
 }

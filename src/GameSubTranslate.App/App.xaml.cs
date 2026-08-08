@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
+using GameSubTranslate.App.Onboarding;
 using GameSubTranslate.App.Overlay;
 using GameSubTranslate.App.Settings;
 using GameSubTranslate.Config;
@@ -63,9 +64,30 @@ public partial class App : System.Windows.Application
 
         _settings = new SettingsStore().Load();
         _logger.Info("App", $"starting (settings at {new SettingsStore().FilePath})");
+
+        // T45: first-run wizard. Returning users (SetupCompleted=true) skip it; the
+        // wizard is modal so the rest of startup (overlay + main) happens AFTER it
+        // dismisses. Skipped → user goes straight into Settings; Completed → they
+        // land on the main window with settings persisted.
+        var wizardSkipped = false;
+        if (!_settings.SetupCompleted)
+        {
+            var wiz = new WelcomeWindow(_settings);
+            wiz.ShowDialog();
+            new SettingsStore().Save(_settings);
+            wizardSkipped = wiz.Result == WelcomeWindow.Outcome.Skipped;
+        }
+
         _overlay = new OverlayWindow(_settings);
         _overlay.ShowOverlay(); // T14: overlay is visible (transparent) from launch; hotkey hides it.
         _main = new MainWindow(new Database(), null, _overlay);
+
+        if (wizardSkipped)
+        {
+            // Funnel into SettingsPanel so the API key gets a chance to be filled
+            // on this same run. The main window opens underneath.
+            OpenSettings();
+        }
 
         _hotkeys = new GlobalHotkeyManager();
         RegisterHotkeys(_settings);

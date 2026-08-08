@@ -57,6 +57,10 @@ public sealed class AppSettings
     /// (Network/Provider only — Auth/BadRequest/RateLimit never failover).</summary>
     public List<ProviderConfig> Providers { get; set; } = new();
 
+    /// <summary>T45: false until the first-run welcome wizard is finished. Gates the wizard so
+    /// returning users skip it.</summary>
+    public bool SetupCompleted { get; set; }
+
     public bool TranslationEnabled =>
         !string.IsNullOrWhiteSpace(ApiKey) &&
         !string.IsNullOrWhiteSpace(BaseUrl) &&
