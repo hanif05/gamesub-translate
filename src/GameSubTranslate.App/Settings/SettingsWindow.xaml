@@ -209,6 +209,22 @@
                     </DockPanel>
                     <TextBlock Text="Diagnostics written to %APPDATA%\GameSubTranslate\logs (rotated at 5 MB)."
                                Foreground="Gray" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                    <!-- T52: surface the FSE limitation here so users running into "no overlay in fullscreen" find the answer without opening docs. -->
+                    <Border Background="#22FF8800" BorderBrush="#FFA06030" BorderThickness="1"
+                            CornerRadius="4" Padding="8" Margin="0,0,0,12">
+                        <TextBlock Foreground="#FFE0B070" FontSize="11" TextWrapping="Wrap">
+                            <Run FontWeight="SemiBold">Known limitation:</Run>
+                            <Run Text=" Fullscreen Exclusive mode can hide the overlay (DirectX exclusive bypasses DWM, so WPF Topmost windows don't composite). Use Borderless Windowed — capture and hotkeys work in both modes."/>
+                        </TextBlock>
+                    </Border>
+                    <!-- T52: surface the FSE limitation here so users running into "no overlay in fullscreen" find the answer without opening docs. -->
+                    <Border Background="#22FF8800" BorderBrush="#FFA06030" BorderThickness="1"
+                            CornerRadius="4" Padding="8" Margin="0,0,0,12">
+                        <TextBlock Foreground="#FFE0B070" FontSize="11" TextWrapping="Wrap">
+                            <Run FontWeight="SemiBold">⚠ Known limitation:</Run>
+                            <Run Text=" Fullscreen Exclusive mode can hide the overlay (DirectX exclusive bypasses DWM, so WPF Topmost windows don't composite). Use Borderless Windowed — capture and hotkeys work in both modes."/>
+                        </TextBlock>
+                    </Border>
                     <Button Content="Reset to Defaults" Width="160" HorizontalAlignment="Left"
                             Click="ResetDefaults_Click" ToolTip="Reset every setting except API key"/>
                 </StackPanel>

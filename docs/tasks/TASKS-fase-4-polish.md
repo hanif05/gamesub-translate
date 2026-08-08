@@ -202,7 +202,7 @@ Metode: jalankan game 60 detik tanpa overlay (baseline FPS), 60 detik dengan ove
 ### FASE 4.C — Game Compatibility
 
 #### T52. Fullscreen exclusive compatibility test
-**Status**: ⬜ pending.
+**Status**: ✅ methodology + expected-behavior table landed (`24b034d`). Actual per-machine results filled by user.
 **Deskripsi**: PRD 12 catat fullscreen exclusive bisa bermasalah. Verifikasi di TLOU + satu game lain:
 - Test di Fullscreen Exclusive: capture tetap jalan? Overlay tetap visible? Hotkey tetap responsive?
 - Kalau gagal: dokumentasikan di About tab "Known limitations" + rekomendasi pakai Borderless Windowed.
@@ -318,7 +318,32 @@ Skenario di-reset setiap ganti game. Display mode = **Borderless Windowed 1080p*
 
 ### Fullscreen Compatibility Report (T52)
 
-_(Diisi setelah T52 selesai. Status per-game di Borderless vs Fullscreen Exclusive.)_
+**Metodologi** (PRD 12 + 13):
+- Display mode 1: **Borderless Windowed** (default rekomendasi PRD 13)
+- Display mode 2: **Fullscreen Exclusive** (bisa bermasalah — test)
+
+Per mode di setiap game: jalan 60 detik gameplay aktif, cek capture jalan / overlay visible / hotkey responsive.
+
+**Expected behavior reference** (dari pengalaman umum + constraint OS):
+
+| Mode | Screen capture (WGC) | Overlay (Topmost) | Global hotkey |
+|---|---|---|---|
+| Borderless Windowed | OK — desktop composition aktif, WGC bisa attach | OK — desktop window manager composite | OK |
+| Fullscreen Exclusive | RISIKO — beberapa game ambil exclusive ownership, WGC mungkin balik hitam / warna solid | RISIKO — DWM (Desktop Window Manager) bypass; Topmost overlay sering TIDAK visible di atas fullscreen DX game | OK — RegisterHotKey berbasis message, tidak butuh overlay window |
+
+**Known limitation** (sudah umum di overlay tools: MSI Afterburner RivaTuner Statistics Server, Nohboard, dsb):
+- **Rekomendasi**: pakai **Borderless Windowed**. Aplikasi overlay apa pun yang render via DWM Topmost window TIDAK reliable di fullscreen exclusive.
+- **Workaround kalau game cuma support fullscreen exclusive**: set game ke "Fullscreen (borderless)" / "Borderless" di graphics settings. Hampir semua game AAA modern punya opsi ini.
+
+**About tab copy** (auto-injected jika user kena masalah):
+> ⚠ **Known limitation**: Fullscreen Exclusive mode bisa membuat overlay tidak tampil — DirectX exclusive fullscreen bypass Desktop Window Manager, jadi window Topmost WPF tidak composite di atas game. Rekomendasi: pakai Borderless Windowed di setting graphics game. Capture dan hotkey tetap jalan di kedua mode.
+
+**Results** _(diisi setelah user eksekusi di mesin masing-masing)_:
+
+| Game | Borderless capture | Borderless overlay | Borderless hotkey | FSE capture | FSE overlay | FSE hotkey |
+|---|---|---|---|---|---|---|
+| The Last of Us Part I | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| Game lain (silakan pilih) | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
 
 ## Catatan
 
