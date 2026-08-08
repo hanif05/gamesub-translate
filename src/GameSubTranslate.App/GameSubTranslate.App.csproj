@@ -44,4 +44,14 @@
     </None>
   </ItemGroup>
 
+  <!-- T43/T44: ship the OCR language data so the installer copies it into {app}\assets\tessdata.
+       Tesseract loads traineddata at runtime from this path; without it the app starts but every
+       OCR call fails. Path is relative to the .csproj (../../assets). -->
+  <ItemGroup>
+    <None Include="..\..\assets\**\*">
+      <Link>assets\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
