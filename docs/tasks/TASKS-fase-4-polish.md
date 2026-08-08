@@ -294,7 +294,27 @@ _(Diisi setelah eksekusi. Format mengikuti T42: tabel skenario + metode + hasil 
 
 ### FPS Impact Report (T50)
 
-_(Diisi setelah T50 selesai. Tabel per-game + skenario baseline/overlay aktif/streaming.)_
+**Metodologi (PRD 7 target: average FPS delta < 5%)**
+
+Alat: [PresentMon](https://github.com/intel/pcm) (Intel, free) — `PresentMon.exe -process_name <exe> -output_file out.csv -terminate_after_seconds 60`.
+
+Protokol per game:
+1. **Baseline** — game berjalan 60 detik tanpa `GameSubTranslate.App.exe` aktif. Capture fullscreen gameplay (no idle menu).
+2. **Overlay idle** — start overlay (transparan, no text). Pilih profile game-nya tapi JANGAN klik Start (pipeline off). Biarkan 60 detik.
+3. **Streaming** — klik Start, biarkan subtitle translation stream aktif dengan text yang berubah. 60 detik.
+
+Skenario di-reset setiap ganti game. Display mode = **Borderless Windowed 1080p** (rekomendasi PRD 13). GPU = apa pun yang user pakai.
+
+**Results** _(diisi setelah eksekusi user)_
+
+| Game | Baseline avg/P95 | Overlay idle avg/P95 | Streaming avg/P95 | Δ avg | Δ P95 |
+|---|---|---|---|---|---|
+| The Last of Us Part I | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| Stardew Valley | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+
+**Catatan visual** _(diisi setelah eksekusi user)_: micro-stutter saat text update / fade in-out: _pending_
+
+**Status**: ⬜ template siap — angka diisi manual setelah user menjalankan test di mesin masing-masing. FPS counter tergantung GPU + driver + game build yang user punya — tidak ada angka default yang bisa diisi di sini.
 
 ### Fullscreen Compatibility Report (T52)
 
