@@ -109,7 +109,7 @@ Tombol "Finish" → simpan settings default + langsung buka Settings Panel untuk
 ### FASE 4.B — UI Polish
 
 #### T46. Overlay text wrapping + max-width + margin
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit 4d4adda).
 **Deskripsi**: Saat ini overlay text satu line panjang bisa overflow ke luar monitor. Fase 4:
 - `OverlayWindow` width jadi configurable (default 800px), `MaxWidth` jadi 80% screen width.
 - TextBlock wrap dengan `TextWrapping=Wrap` + padding 8px atas/bawah + 16px kiri/kanan.
@@ -125,7 +125,7 @@ Tombol "Finish" → simpan settings default + langsung buka Settings Panel untuk
 **Depends on**: T14 (Fase 2 overlay sudah ada).
 
 #### T47. Overlay fade in/out animation
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit 97ba11b).
 **Deskripsi**: PRD 6.6 minta animasi halus. Pakai WPF `DoubleAnimation` di `Opacity`:
 - ShowText: fade in 0 → 1 dalam 200ms.
 - New text menggantikan old: cross-fade 150ms (old fade out, new fade in).
