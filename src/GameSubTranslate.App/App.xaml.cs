@@ -26,13 +26,38 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(System.Windows.StartupEventArgs e)
     {
+        // Surface unhandled exceptions to stderr so self-checks don't fail silently when
+        // a Background-thread throw is swallowed by the WPF default handler.
+        AppDomain.CurrentDomain.UnhandledException += (_, ev) =>
+        {
+            var ex = ev.ExceptionObject as Exception;
+            Console.Error.WriteLine($"[unhandled] {ex}");
+        };
         base.OnStartup(e);
         ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
 
         // Headless self-checks: run checks then exit before any window is shown.
+        // Run on the thread pool so .GetAwaiter().GetResult() inside self-checks doesn't
+        // deadlock against the WPF dispatcher (sync-over-async on the UI thread = trap).
         if (e.Args.Length > 0 && e.Args[0].StartsWith("--selfcheck"))
         {
-            Shutdown(SelfChecks.Run(e.Args[0]));
+            // Run on thread pool so .GetAwaiter().GetResult() inside the self-check doesn't
+            // deadlock against the WPF dispatcher (sync-over-async on UI thread = trap).
+            int rc = 2; // generic failure if the task itself faults
+            try
+            {
+                rc = Task.Run(() => SelfChecks.Run(e.Args[0])).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[selfcheck-exception] {ex}");
+                rc = 2;
+            }
+            Console.Error.WriteLine($"[selfcheck-exit] rc={rc}");
+            Console.Out.Flush();
+            Console.Error.Flush();
+            // Shutdown must be invoked on the dispatcher thread; marshal back.
+            Dispatcher.BeginInvoke(new Action(() => Shutdown(rc)));
             return;
         }
 

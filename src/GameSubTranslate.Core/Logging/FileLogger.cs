@@ -67,13 +67,35 @@ public sealed class FileLogger : IDisposable
     private void Rotate(DateTime now)
     {
         Close();
-        var next = ArchiveCount(now.Date) + 1;
-        var archive = Path.Combine(_dir, $"app-{now:yyyy-MM-dd}-{next}.log");
-        File.Move(_path!, archive);
-        // Prune oldest archives for today beyond MaxArchives.
-        foreach (var stale in Directory.GetFiles(_dir, $"app-{now:yyyy-MM-dd}-*.log")
-                     .OrderBy(f => f).Skip(MaxArchives).ToList())
-            File.Delete(stale);
+        // Numbered-slot rotation: archives are app-YYYY-MM-DD-1..N.log where -1 is the
+        // most recent and -N is the oldest. Each rotation:
+        //   1) walks archives from oldest suffix upward, shifting each to slot+1, dropping
+        //      anything that would land beyond MaxArchives
+        //   2) moves the active file into slot -1
+        // This keeps -1 always meaning "newest" and never creates a slot beyond MaxArchives.
+        var existing = Directory.GetFiles(_dir, $"app-{now:yyyy-MM-dd}-*.log");
+        // OrderBy ascending: -1, -2, -3... — walk from oldest so each source still exists
+        // when we move it. Walk from the END (oldest) toward the START (newest).
+        foreach (var src in existing.OrderByDescending(f => f))
+        {
+            // Extract trailing number from file name.
+            var name = Path.GetFileName(src);
+            var numStr = name.Substring(name.LastIndexOf('-') + 1);
+            numStr = numStr.Substring(0, numStr.LastIndexOf('.'));
+            int num = int.Parse(numStr);
+            int next = num + 1;
+            if (next > MaxArchives)
+            {
+                File.Delete(src); // beyond ceiling → drop
+            }
+            else
+            {
+                var dst = Path.Combine(_dir, $"app-{now:yyyy-MM-dd}-{next}.log");
+                File.Move(src, dst);
+            }
+        }
+        var slot1 = Path.Combine(_dir, $"app-{now:yyyy-MM-dd}-1.log");
+        File.Move(_path!, slot1);
         _path = null;
         EnsureWriter(now);
     }
