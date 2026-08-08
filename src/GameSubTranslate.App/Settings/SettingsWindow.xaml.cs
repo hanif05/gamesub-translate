@@ -100,6 +100,7 @@ public partial class SettingsWindow : Window
         PauseHotkeyText.Text = _settings.HotkeyPauseCapture;
         SettingsHotkeyText.Text = _settings.HotkeyOpenSettings;
         ManualHotkeyText.Text = _settings.HotkeyManualCapture;
+        CycleLangHotkeyText.Text = _settings.HotkeyCycleTargetLang;
         RefreshProviders();
     }
 
@@ -349,6 +350,8 @@ public partial class SettingsWindow : Window
         => BeginHotkeyCapture(nameof(AppSettings.HotkeyOpenSettings));
     private void ManualHotkey_Change(object sender, RoutedEventArgs e)
         => BeginHotkeyCapture(nameof(AppSettings.HotkeyManualCapture));
+    private void CycleLangHotkey_Change(object sender, RoutedEventArgs e)
+        => BeginHotkeyCapture(nameof(AppSettings.HotkeyCycleTargetLang));
 
     private void BeginHotkeyCapture(string settingName)
     {
@@ -400,6 +403,7 @@ public partial class SettingsWindow : Window
             (_settings.HotkeyPauseCapture, nameof(AppSettings.HotkeyPauseCapture)),
             (_settings.HotkeyOpenSettings, nameof(AppSettings.HotkeyOpenSettings)),
             (_settings.HotkeyManualCapture, nameof(AppSettings.HotkeyManualCapture)),
+            (_settings.HotkeyCycleTargetLang, nameof(AppSettings.HotkeyCycleTargetLang)),
         })
         {
             if (name == settingName) continue;
@@ -416,6 +420,7 @@ public partial class SettingsWindow : Window
             case nameof(AppSettings.HotkeyPauseCapture): _settings.HotkeyPauseCapture = spec; PauseHotkeyText.Text = spec; break;
             case nameof(AppSettings.HotkeyOpenSettings): _settings.HotkeyOpenSettings = spec; SettingsHotkeyText.Text = spec; break;
             case nameof(AppSettings.HotkeyManualCapture): _settings.HotkeyManualCapture = spec; ManualHotkeyText.Text = spec; break;
+            case nameof(AppSettings.HotkeyCycleTargetLang): _settings.HotkeyCycleTargetLang = spec; CycleLangHotkeyText.Text = spec; break;
         }
     }
 

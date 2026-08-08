@@ -381,4 +381,14 @@ public partial class MainWindow : Window
         // the next Start builds one with the fresh config (T26: settings change = rebuild).
         ResetPipeline("Settings changed — click Start to resume with the new config.");
     }
+
+    /// <summary>T51: target-language switch from tray submenu / cycle hotkey. The pipeline carries
+    /// the target language in the TranslationClient, so it has to be rebuilt before the next capture.
+    /// The active profile's per-profile TargetLang is left alone — global setting wins (matches
+    /// existing per-profile-vs-global resolution at EnsurePipeline time).</summary>
+    public void SwitchTargetLang(string code)
+    {
+        _settings.TargetLang = code;
+        ResetPipeline($"Target lang switched to {code}. Click Start to resume.");
+    }
 }

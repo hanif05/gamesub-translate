@@ -23,6 +23,7 @@ public partial class App : System.Windows.Application
     private TaskbarIcon? _tray;
     private ContextMenu? _trayMenu;
     private MenuItem? _regionMenuItem;
+    private MenuItem? _langMenuItem;
     private ForegroundWatcher? _fgWatcher;
     private AppSettings _settings = new();
     private FileLogger _logger = new();
@@ -147,6 +148,7 @@ public partial class App : System.Windows.Application
         var pause = new MenuItem { Header = "Pause / Resume" };
         pause.Click += (_, _) => TogglePause();
         _regionMenuItem = new MenuItem { Header = "Region" }; // rebuilt on profile change
+        _langMenuItem = new MenuItem { Header = "Target language" }; // T51: quick switch submenu
         var settings = new MenuItem { Header = "Settings" };
         settings.Click += (_, _) => OpenSettings();
         var exit = new MenuItem { Header = "Exit" };
@@ -154,6 +156,7 @@ public partial class App : System.Windows.Application
         _trayMenu.Items.Add(overlay);
         _trayMenu.Items.Add(pause);
         _trayMenu.Items.Add(_regionMenuItem);
+        _trayMenu.Items.Add(_langMenuItem);
         _trayMenu.Items.Add(new Separator());
         _trayMenu.Items.Add(settings);
         _trayMenu.Items.Add(new Separator());
@@ -169,6 +172,7 @@ public partial class App : System.Windows.Application
             else ShowMainWindow();
         };
         RebuildRegionMenu();
+        RebuildLangMenu();
         RefreshTrayStatus();
     }
 
@@ -204,6 +208,43 @@ public partial class App : System.Windows.Application
             };
             _regionMenuItem.Items.Add(mi);
         }
+    }
+
+    /// <summary>T51: ordered list the tray submenu + cycle hotkey iterate over. Matches the
+    /// suggestion in the PRD (id is the user's default; the rest cover their multi-target games).</summary>
+    private static readonly string[] TargetLangCycle = { "id", "en", "ja", "ko", "zh", "fr", "de", "es" };
+
+    private void RebuildLangMenu()
+    {
+        if (_langMenuItem is null) return;
+        _langMenuItem.Items.Clear();
+        foreach (var code in TargetLangCycle)
+        {
+            var mi = new MenuItem { Header = code, IsCheckable = true, IsChecked = _settings.TargetLang == code };
+            string captured = code;
+            mi.Click += (_, _) => SwitchTargetLang(captured);
+            _langMenuItem.Items.Add(mi);
+        }
+    }
+
+    /// <summary>T51: switch + save + rebuild pipeline + refresh the menu check marks.</summary>
+    private void SwitchTargetLang(string code)
+    {
+        if (_settings.TargetLang == code) return;
+        _settings.TargetLang = code;
+        new SettingsStore().Save(_settings);
+        _main?.SwitchTargetLang(code); // drops + rebuilds pipeline with new target lang
+        RebuildLangMenu();
+        _logger.Info("Pipeline", $"target lang switched to {code}");
+    }
+
+    /// <summary>T51: hotkey cycles through TargetLangCycle. Order matches the tray menu so the
+    /// user sees the same sequence both ways.</summary>
+    private void CycleTargetLang()
+    {
+        var i = Array.IndexOf(TargetLangCycle, _settings.TargetLang);
+        var next = TargetLangCycle[(i + 1) % TargetLangCycle.Length];
+        SwitchTargetLang(next);
     }
 
     /// <summary>T49: tooltip string + icon color. Three states (ok/degraded/error).</summary>
@@ -301,6 +342,8 @@ public partial class App : System.Windows.Application
             _hotkeys.Register("OpenSettings", mods, key, OpenSettings);
         if (GlobalHotkeyManager.TryParse(s.HotkeyManualCapture, out mods, out key))
             _hotkeys.Register("ManualCapture", mods, key, ManualCapture);
+        if (GlobalHotkeyManager.TryParse(s.HotkeyCycleTargetLang, out mods, out key))
+            _hotkeys.Register("CycleTargetLang", mods, key, CycleTargetLang);
     }
 
     /// <summary>T19: hotkey toggles overlay visibility. Hide keeps the text state.</summary>
@@ -339,6 +382,7 @@ public partial class App : System.Windows.Application
         _overlay?.ApplySettings(_settings);
         _main?.ReloadSettings(_settings);
         RegisterHotkeys(_settings);
+        RebuildLangMenu(); // T51: TargetLang may have changed in the settings panel.
     }
 
     /// <summary>T22: hotkey triggers a single capture → OCR → translate cycle.</summary>

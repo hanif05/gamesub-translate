@@ -48,6 +48,8 @@ public sealed class AppSettings
     public string HotkeyPauseCapture { get; set; } = "Ctrl+Alt+P";
     public string HotkeyOpenSettings { get; set; } = "Ctrl+Alt+S";
     public string HotkeyManualCapture { get; set; } = "Ctrl+Alt+Space";
+    /// <summary>T51: cycles TargetLang through id→en→ja→ko→zh→fr→de→es.</summary>
+    public string HotkeyCycleTargetLang { get; set; } = "Ctrl+Alt+L";
 
     // Last-active state (T9) so the active region survives restarts.
     public int? ActiveProfileId { get; set; }

@@ -166,10 +166,15 @@
                         <TextBlock Text="Open settings" VerticalAlignment="Center"/>
                         <TextBlock x:Name="SettingsHotkeyText" Foreground="Gray" Margin="12,0,0,0" VerticalAlignment="Center"/>
                     </DockPanel>
-                    <DockPanel>
+                    <DockPanel Margin="0,0,0,8">
                         <Button x:Name="ManualHotkeyBtn" Content="Change" DockPanel.Dock="Right" Width="80" Click="ManualHotkey_Change"/>
                         <TextBlock Text="Manual capture" VerticalAlignment="Center"/>
                         <TextBlock x:Name="ManualHotkeyText" Foreground="Gray" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <DockPanel>
+                        <Button x:Name="CycleLangHotkeyBtn" Content="Change" DockPanel.Dock="Right" Width="80" Click="CycleLangHotkey_Change"/>
+                        <TextBlock Text="Cycle target language" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="CycleLangHotkeyText" Foreground="Gray" Margin="12,0,0,0" VerticalAlignment="Center"/>
                     </DockPanel>
                     <TextBlock x:Name="HotkeyHint" Text="" Foreground="#FFC080" Margin="0,12,0,0"
                                Visibility="Collapsed" TextWrapping="Wrap"/>
