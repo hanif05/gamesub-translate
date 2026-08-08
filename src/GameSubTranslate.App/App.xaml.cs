@@ -5,6 +5,7 @@ using GameSubTranslate.App.Overlay;
 using GameSubTranslate.App.Settings;
 using GameSubTranslate.Config;
 using GameSubTranslate.Hotkeys;
+using GameSubTranslate.Logging;
 using GameSubTranslate.Profiles;
 using GameSubTranslate.Storage;
 using Hardcodet.Wpf.TaskbarNotification;
@@ -21,20 +22,47 @@ public partial class App : System.Windows.Application
     private TaskbarIcon? _tray;
     private ForegroundWatcher? _fgWatcher;
     private AppSettings _settings = new();
+    private FileLogger _logger = new();
 
     protected override void OnStartup(System.Windows.StartupEventArgs e)
     {
+        // Surface unhandled exceptions to stderr so self-checks don't fail silently when
+        // a Background-thread throw is swallowed by the WPF default handler.
+        AppDomain.CurrentDomain.UnhandledException += (_, ev) =>
+        {
+            var ex = ev.ExceptionObject as Exception;
+            Console.Error.WriteLine($"[unhandled] {ex}");
+        };
         base.OnStartup(e);
         ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
 
         // Headless self-checks: run checks then exit before any window is shown.
+        // Run on the thread pool so .GetAwaiter().GetResult() inside self-checks doesn't
+        // deadlock against the WPF dispatcher (sync-over-async on the UI thread = trap).
         if (e.Args.Length > 0 && e.Args[0].StartsWith("--selfcheck"))
         {
-            Shutdown(SelfChecks.Run(e.Args[0]));
+            // Run on thread pool so .GetAwaiter().GetResult() inside the self-check doesn't
+            // deadlock against the WPF dispatcher (sync-over-async on UI thread = trap).
+            int rc = 2; // generic failure if the task itself faults
+            try
+            {
+                rc = Task.Run(() => SelfChecks.Run(e.Args[0])).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[selfcheck-exception] {ex}");
+                rc = 2;
+            }
+            Console.Error.WriteLine($"[selfcheck-exit] rc={rc}");
+            Console.Out.Flush();
+            Console.Error.Flush();
+            // Shutdown must be invoked on the dispatcher thread; marshal back.
+            Dispatcher.BeginInvoke(new Action(() => Shutdown(rc)));
             return;
         }
 
         _settings = new SettingsStore().Load();
+        _logger.Info("App", $"starting (settings at {new SettingsStore().FilePath})");
         _overlay = new OverlayWindow(_settings);
         _overlay.ShowOverlay(); // T14: overlay is visible (transparent) from launch; hotkey hides it.
         _main = new MainWindow(new Database(), null, _overlay);
@@ -43,6 +71,15 @@ public partial class App : System.Windows.Application
         RegisterHotkeys(_settings);
 
         InitTray();
+
+        // T39: mirror categorized translation errors onto the tray icon tooltip, so a broken
+        // API key is visible even when overlays are hidden mid-game.
+        _main.ErrorReported += msg => Dispatcher.Invoke(() =>
+        {
+            if (_tray is not null)
+                _tray.ToolTipText = "Translation error: " + msg;
+            _logger.Error("Pipeline", msg);
+        });
 
         // T25: auto-load profile when a matching game window comes to the foreground.
         _fgWatcher = new ForegroundWatcher(
@@ -179,6 +216,7 @@ public partial class App : System.Windows.Application
     private void ReloadSettings()
     {
         _settings = new SettingsStore().Load();
+        _logger.Info("Settings", "settings saved — reloaded");
         _overlay?.ApplySettings(_settings);
         _main?.ReloadSettings(_settings);
         RegisterHotkeys(_settings);
@@ -189,10 +227,12 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _logger.Info("App", "shutting down");
         _fgWatcher?.Dispose();
         _hotkeys?.Dispose();
         _main?.Dispose();
         _tray?.Dispose();
+        _logger.Dispose();
         base.OnExit(e);
     }
 }

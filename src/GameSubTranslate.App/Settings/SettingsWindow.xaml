@@ -26,6 +26,21 @@
                                 Width="130" Margin="8,0,0,0" Click="TestConnection_Click"/>
                         <TextBlock x:Name="TestResult" VerticalAlignment="Center" TextWrapping="Wrap" Text=""/>
                     </DockPanel>
+
+                    <!-- T40: fallback providers. Primary (above) is always tried first; if it fails
+                         3x with Network/Provider errors, the client hops here in list order. -->
+                    <TextBlock Text="Fallback providers" FontWeight="SemiBold" Margin="0,14,0,4"/>
+                    <DockPanel Margin="0,0,0,6">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Content="Add" Width="52" Margin="6,0,4,0" Click="ProviderAdd_Click"/>
+                            <Button Content="Edit" Width="52" Margin="0,0,4,0" Click="ProviderEdit_Click"/>
+                            <Button Content="Remove" Width="62" Click="ProviderRemove_Click"/>
+                        </StackPanel>
+                        <ListBox x:Name="ProviderList" MinHeight="70" DisplayMemberPath="Name"
+                                 SelectionChanged="ProviderList_SelectionChanged"/>
+                    </DockPanel>
+                    <TextBlock Text="Fallback is tried when the primary fails 3× (Network/Provider). A bad API key never failovers."
+                               Foreground="Gray" TextWrapping="Wrap" FontSize="11"/>
                 </StackPanel>
             </TabItem>
 
@@ -65,7 +80,7 @@
                     <TextBlock Text="OCR engine" FontWeight="SemiBold"/>
                     <ComboBox x:Name="OcrEngineBox" Margin="0,4,0,0" Width="160" HorizontalAlignment="Left">
                         <ComboBoxItem Content="Tesseract" Tag="Tesseract"/>
-                        <ComboBoxItem Content="Vision AI (coming soon)" Tag="VisionAi" IsEnabled="False"/>
+                        <ComboBoxItem Content="Vision AI" Tag="VisionAi"/>
                     </ComboBox>
                 </StackPanel>
             </TabItem>
@@ -154,6 +169,21 @@
                         <TextBlock Text="Profiles" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </DockPanel>
                     <ListBox x:Name="ProfileList" DisplayMemberPath="Name" MinHeight="240"/>
+                </StackPanel>
+            </TabItem>
+
+            <!-- ============ About / Logs ============ -->
+            <TabItem Header="About">
+                <StackPanel Margin="10">
+                    <TextBlock Text="GameSubTranslate" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                    <TextBlock Text="Auto-translate subtitle game via screen capture + OCR + AI. Personal tool."
+                               Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                    <DockPanel Margin="0,0,0,6">
+                        <Button Content="Open Logs Folder" DockPanel.Dock="Right" Width="130" Margin="8,0,0,0" Click="OpenLogsFolder_Click"/>
+                        <TextBlock Text="Logs" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <TextBlock Text="Diagnostics written to %APPDATA%\GameSubTranslate\logs (rotated at 5 MB)."
+                               Foreground="Gray" FontSize="11" TextWrapping="Wrap"/>
                 </StackPanel>
             </TabItem>
         </TabControl>

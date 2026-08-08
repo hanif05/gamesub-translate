@@ -25,7 +25,15 @@ public sealed class TranslatePipeline : IDisposable
     private readonly TranslationClient? _translator;
     private readonly TranslationCacheRepository? _cache;
     private readonly Action<string> _onTranslated;
+    // T36: incremental token callback for streaming. When set, the loop streams tokens to the
+    // overlay instead of waiting for the full response. Null → fall back to single-shot.
+    private readonly Action<string>? _onToken;
+    private readonly Action? _onStreamStart;
+    private readonly Action? _onStreamEnd;
     private readonly int _x, _y, _w, _h, _intervalMs;
+    private readonly int _idleIntervalMs;
+    private readonly int _idleThreshold;
+    private readonly int _idleWindowMs;
 
     private readonly object _sync = new();
     // Serializes access to the WGC capture source: the capture instance is not thread-safe
@@ -38,9 +46,16 @@ public sealed class TranslatePipeline : IDisposable
     private volatile bool _running;
     private byte[]? _lastPng;
     private string? _lastText;
+    // T33: idle tracking — consecutive unchanged frames + wall-clock of last change.
+    private int _unchangedCount;
+    private DateTime _lastChangeAt = DateTime.UtcNow;
 
     /// <summary>Raised on state changes ("started", "paused", errors…). May fire off the UI thread.</summary>
     public event Action<string>? StatusChanged;
+
+    /// <summary>T40: raised when the translator switches to a fallback provider (name) or back to
+    /// the primary ("primary"). Lets the UI mark the overlay "degraded". May fire off the UI thread.</summary>
+    public event Action<string>? TranslatorFailover;
 
     public bool IsRunning => _running;
     public bool IsPaused => _paused;
@@ -49,25 +64,42 @@ public sealed class TranslatePipeline : IDisposable
 
     public TranslatePipeline(IScreenCapture capture, IOcrEngine ocr, TranslationClient? translator,
         TranslationCacheRepository? cache, int x, int y, int w, int h, int intervalMs,
-        Action<string> onTranslated)
+        Action<string> onTranslated,
+        Action<string>? onToken = null, Action? onStreamStart = null, Action? onStreamEnd = null,
+        int idleIntervalMs = 3000, int idleThreshold = 3, int idleWindowMs = 5000)
     {
         _capture = capture;
         _ocr = ocr;
         _translator = translator;
         _cache = cache;
         _x = x; _y = y; _w = w; _h = h; _intervalMs = intervalMs;
+        _idleIntervalMs = idleIntervalMs;
+        _idleThreshold = idleThreshold;
+        _idleWindowMs = idleWindowMs;
         _onTranslated = onTranslated;
+        _onToken = onToken;
+        _onStreamStart = onStreamStart;
+        _onStreamEnd = onStreamEnd;
     }
 
     /// <summary>Builds a pipeline over the real WGC capture for the monitor containing (x,y).</summary>
     public static TranslatePipeline ForEnvironment(int x, int y, int w, int h, int intervalMs,
-        IOcrEngine ocr, AppConfig cfg, TranslationCacheRepository? cache, Action<string> onTranslated)
+        IOcrEngine ocr, AppConfig cfg, TranslationCacheRepository? cache, Action<string> onTranslated,
+        Action<string>? onToken = null, Action? onStreamStart = null, Action? onStreamEnd = null,
+        int idleIntervalMs = 3000, int idleThreshold = 3, int idleWindowMs = 5000)
     {
         TranslationClient? translator = null;
         if (cfg.TranslationEnabled)
-            translator = new TranslationClient(cfg.ApiKey!, cfg.BaseUrl!, cfg.Model!, cfg.SourceLang, cfg.TargetLang);
-        return new TranslatePipeline(ScreenCapture.ForMonitorAt(x, y), ocr, translator, cache,
-            x, y, w, h, intervalMs, onTranslated);
+            translator = new TranslationClient(cfg.ApiKey!, cfg.BaseUrl!, cfg.Model!, cfg.SourceLang, cfg.TargetLang,
+                providers: cfg.Providers);
+        var pipeline = new TranslatePipeline(ScreenCapture.ForMonitorAt(x, y), ocr, translator, cache,
+            x, y, w, h, intervalMs, onTranslated,
+            onToken, onStreamStart, onStreamEnd,
+            idleIntervalMs, idleThreshold, idleWindowMs);
+        // T40: hop events bubble out so the app can flag "degraded" on the overlay.
+        if (translator is not null)
+            translator.FailoverChanged += name => pipeline.TranslatorFailover?.Invoke(name ?? "primary");
+        return pipeline;
     }
 
     public void Start()
@@ -128,7 +160,7 @@ public sealed class TranslatePipeline : IDisposable
         byte[] png = await CaptureLockedAsync(ct);
         if (png.Length == 0) return null;
         _lastPng = png;
-        string text = _ocr.Recognize(png);
+        string text = await _ocr.RecognizeAsync(png, ct);
         if (string.IsNullOrWhiteSpace(text)) return null;
         _lastText = text;
         string? translated = await TranslateAsync(text, ct);
@@ -165,24 +197,34 @@ public sealed class TranslatePipeline : IDisposable
             {
                 if (_paused)
                 {
-                    // Keep the newest frame available so resume compares against the latest
-                    // subtitle state — no backlog, no burst of API calls.
-                    byte[] pausedFrame = await CaptureLockedAsync(ct);
-                    if (pausedFrame.Length > 0) _lastPng = pausedFrame;
+                    // T33: paused = zero work. Capture itself is the most expensive step
+                    // (full screen read + PNG encode); skip it entirely. Resume() will
+                    // pick up the next change from the next tick — no backlog, no burst.
+                    // Reset idle tracking so resume doesn't think we're already idle.
+                    _unchangedCount = 0;
+                    _lastChangeAt = DateTime.UtcNow;
                 }
                 else
                 {
                     byte[] png = await CaptureLockedAsync(ct);
-                    if (png.Length > 0 && ChangeDetector.IsChanged(png, _lastPng))
+                    if (png.Length > 0)
                     {
-                        _lastPng = png;
-                        string text = _ocr.Recognize(png);
-                        if (!string.IsNullOrWhiteSpace(text) && text != _lastText)
+                        bool changed = ChangeDetector.IsChanged(png, _lastPng);
+                        if (changed)
                         {
-                            _lastText = text;
-                            string? translated = await TranslateAsync(text, ct);
-                            if (translated is not null)
-                                _onTranslated(translated);
+                            _lastPng = png;
+                            _lastChangeAt = DateTime.UtcNow;
+                            _unchangedCount = 0;
+                            string text = await _ocr.RecognizeAsync(png, ct);
+                            if (!string.IsNullOrWhiteSpace(text) && text != _lastText)
+                            {
+                                _lastText = text;
+                                await TranslateAndShowAsync(text, ct);
+                            }
+                        }
+                        else
+                        {
+                            _unchangedCount++;
                         }
                     }
                 }
@@ -197,9 +239,21 @@ public sealed class TranslatePipeline : IDisposable
                 StatusChanged?.Invoke(LastError);
             }
 
-            try { await Task.Delay(_intervalMs, ct); }
+            int delay = CurrentInterval();
+            try { await Task.Delay(delay, ct); }
             catch (OperationCanceledException) { break; }
         }
+    }
+
+    /// <summary>T33: pick interval based on idle state. Normal unless we have enough
+    /// unchanged frames OR enough wall-clock time has passed without a change.</summary>
+    private int CurrentInterval()
+    {
+        if (_paused) return _intervalMs;
+        bool windowElapsed = (DateTime.UtcNow - _lastChangeAt).TotalMilliseconds >= _idleWindowMs;
+        if (_unchangedCount >= _idleThreshold || windowElapsed)
+            return _idleIntervalMs;
+        return _intervalMs;
     }
 
     private async Task<string?> TranslateAsync(string text, CancellationToken ct)
@@ -211,8 +265,7 @@ public sealed class TranslatePipeline : IDisposable
 
             // T26 scenario 8: end-to-end latency from subtitle change to translated output.
             var sw = Stopwatch.StartNew();
-            string? translated = _cache?.Get(text, _translator.TargetLang)
-                ?? await _translator.TranslateAsync(text, ct);
+            string? translated = LookupCached(text) ?? await _translator.TranslateAsync(text, ct);
             sw.Stop();
             Console.WriteLine($"[latency] {sw.Elapsed.TotalMilliseconds:F0}ms \"{text}\" -> \"{translated}\"");
             if (translated is not null && _cache is not null)
@@ -223,11 +276,130 @@ public sealed class TranslatePipeline : IDisposable
         {
             throw; // cancellation propagates out of the loop
         }
-        catch (Exception ex)
+        catch (TranslationException ex)
         {
-            LastError = $"[translate-error] {ex.Message}";
+            // T39: categorized — render an actionable hint, not a generic message.
+            LastError = $"[translate-error:{Category(ex.Category)}] {ex.Message}";
             StatusChanged?.Invoke(LastError);
             return null;
         }
+        catch (Exception ex)
+        {
+            LastError = $"[translate-error:unknown] {ex.Message}";
+            StatusChanged?.Invoke(LastError);
+            return null;
+        }
+    }
+
+    /// <summary>T39: user-facing hint for each error category.</summary>
+    private static string Category(ErrorCategory c) => c switch
+    {
+        ErrorCategory.Auth => "auth-error: cek API key di Settings",
+        ErrorCategory.RateLimit => "rate-limit: provider limiting, tunggu lalu retry",
+        ErrorCategory.Network => "network: cek koneksi internet",
+        ErrorCategory.BadRequest => "bad-request: periksa konfigurasi provider",
+        ErrorCategory.Provider => "provider: server translation error",
+        _ => "unknown",
+    };
+
+    /// <summary>
+    /// T37: exact-match first, then fuzzy by Levenshtein against recent cache rows. Returns
+    /// null if neither hits — caller falls through to a fresh API call. Logs a [cache-fuzzy]
+    /// marker when fuzzy saves a round-trip so the operator can see how often it kicks in.
+    /// </summary>
+    private string? LookupCached(string text)
+    {
+        if (_cache is null || _translator is null) return null;
+        var exact = _cache.Get(text, _translator.TargetLang);
+        if (exact is not null) return exact;
+        var fuzzy = _cache.GetFuzzy(text, _translator.TargetLang);
+        if (fuzzy is { } f)
+        {
+            Console.WriteLine($"[cache-fuzzy] similarity={f.similarity:F2} \"{text}\" -> \"{f.translated}\"");
+            return f.translated;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// T36: real-time translation + display. Cache hit → single-shot path (full text immediately).
+    /// Cache miss + streaming callback set → stream tokens incrementally to the overlay.
+    /// Cache miss + no streaming callback → falls back to <see cref="TranslateAsync"/> for back-compat.
+    /// </summary>
+    private async Task<string?> TranslateAndShowAsync(string text, CancellationToken ct)
+    {
+        // Cache hit short-circuits both streaming and the single-shot path — we already have the
+        // answer, so stream it as one chunk through the same code path for consistency.
+        var cached = LookupCached(text);
+        if (cached is not null)
+        {
+            _onStreamStart?.Invoke();
+            _onToken?.Invoke(cached);
+            _onStreamEnd?.Invoke();
+            _onTranslated(cached);
+            return cached;
+        }
+
+        if (_translator is null) return text; // passthrough
+
+        if (_onToken is null)
+        {
+            // No streaming wiring → keep the old single-shot path.
+            var translated = await TranslateAsync(text, ct);
+            if (translated is not null) _onTranslated(translated);
+            return translated;
+        }
+
+        // Streaming path: yield tokens to the overlay as they arrive, accumulate for cache write.
+        var sw = Stopwatch.StartNew();
+        var buffer = new System.Text.StringBuilder();
+        DateTime firstTokenAt = default;
+        try
+        {
+            _onStreamStart?.Invoke();
+            await foreach (var token in _translator.TranslateStreamAsync(text, ct).WithCancellation(ct))
+            {
+                if (firstTokenAt == default) firstTokenAt = DateTime.UtcNow;
+                buffer.Append(token);
+                _onToken(token);
+            }
+            _onStreamEnd?.Invoke();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (TranslationException ex)
+        {
+            _onStreamEnd?.Invoke();
+            LastError = $"[translate-error:{Category(ex.Category)}] {ex.Message}";
+            StatusChanged?.Invoke(LastError);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _onStreamEnd?.Invoke();
+            LastError = $"[translate-error:unknown] {ex.Message}";
+            StatusChanged?.Invoke(LastError);
+            return null;
+        }
+
+        var full = buffer.ToString();
+        sw.Stop();
+        if (firstTokenAt != default)
+        {
+            var firstTokenMs = (firstTokenAt - DateTime.UtcNow.AddMilliseconds(-sw.Elapsed.TotalMilliseconds)).TotalMilliseconds;
+            Console.WriteLine($"[latency] first-token~{firstTokenMs:F0}ms total={sw.Elapsed.TotalMilliseconds:F0}ms \"{text}\" -> \"{full}\"");
+        }
+        else
+        {
+            Console.WriteLine($"[latency] {sw.Elapsed.TotalMilliseconds:F0}ms \"{text}\" -> \"{full}\" (no tokens)");
+        }
+        if (full.Length > 0)
+        {
+            _onTranslated(full);
+            if (_cache is not null) _cache.Put(text, full, _translator.TargetLang);
+        }
+        return full.Length > 0 ? full : null;
     }
 }

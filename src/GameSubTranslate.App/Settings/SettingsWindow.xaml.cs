@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -80,6 +81,63 @@ public partial class SettingsWindow : Window
         PauseHotkeyText.Text = _settings.HotkeyPauseCapture;
         SettingsHotkeyText.Text = _settings.HotkeyOpenSettings;
         ManualHotkeyText.Text = _settings.HotkeyManualCapture;
+        RefreshProviders();
+    }
+
+    // ---- T40 fallback providers ----
+
+    private void RefreshProviders() => ProviderList.ItemsSource = _settings.Providers.ToList();
+
+    private void ProviderAdd_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new ProviderEditWindow();
+        if (dlg.ShowDialog() == true)
+        {
+            _settings.Providers.Add(dlg.Result);
+            RefreshProviders();
+        }
+    }
+
+    private void ProviderEdit_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedProvider is not { } sel) return;
+        var dlg = new ProviderEditWindow(sel);
+        if (dlg.ShowDialog() == true)
+        {
+            var i = _settings.Providers.IndexOf(sel);
+            _settings.Providers[i] = dlg.Result;
+            RefreshProviders();
+        }
+    }
+
+    private void ProviderRemove_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedProvider is not { } sel) return;
+        _settings.Providers.Remove(sel);
+        RefreshProviders();
+    }
+
+    private void ProviderList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // ItemsSource snapshot shares object refs, so SelectedItem drives SelectedProvider directly.
+    }
+
+    private ProviderConfig? SelectedProvider => ProviderList.SelectedItem as ProviderConfig;
+
+    // ---- About / Logs ----
+
+    private void OpenLogsFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "GameSubTranslate", "logs");
+        Directory.CreateDirectory(dir);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "explorer.exe",
+            Arguments = dir,
+            UseShellExecute = true,
+        });
     }
 
     // ---- API & Model ----

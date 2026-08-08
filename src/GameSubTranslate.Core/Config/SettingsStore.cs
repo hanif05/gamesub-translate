@@ -53,6 +53,7 @@ public sealed class SettingsStore
                 HotkeyManualCapture = dto.HotkeyManualCapture ?? "Ctrl+Alt+Space",
                 ActiveProfileId = dto.ActiveProfileId,
                 ActiveRegionId = dto.ActiveRegionId,
+                Providers = dto.Providers ?? new(),
             };
         }
         catch
@@ -89,6 +90,7 @@ public sealed class SettingsStore
             HotkeyManualCapture = s.HotkeyManualCapture,
             ActiveProfileId = s.ActiveProfileId,
             ActiveRegionId = s.ActiveRegionId,
+            Providers = s.Providers,
         };
 
         File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, JsonOpts));
@@ -138,5 +140,6 @@ public sealed class SettingsStore
         public string? HotkeyManualCapture { get; set; }
         public int? ActiveProfileId { get; set; }
         public int? ActiveRegionId { get; set; }
+        public List<ProviderConfig>? Providers { get; set; }
     }
 }

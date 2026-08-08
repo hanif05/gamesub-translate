@@ -244,29 +244,52 @@ public partial class MainWindow : Window
             Model = _settings.Model,
             SourceLang = _settings.SourceLang,
             TargetLang = _settings.TargetLang,
+            Providers = _settings.Providers,
         };
         if (!cfg.TranslationEnabled) { SetStatus("Translation not configured — set API key in Settings."); return null; }
 
-        var ocr = new TesseractOcrEngine();
+        // T38: engine chosen from settings (Tesseract vs Vision AI). VisionAI needs a
+        // configured provider; factory falls back to Tesseract if that's missing.
+        var ocr = OcrEngineFactory.Create(_settings.OcrEngine, cfg);
         _pipeline = TranslatePipeline.ForEnvironment(
             region.X, region.Y, region.Width, region.Height, _settings.CaptureIntervalMs,
-            ocr, cfg, cache: new TranslationCacheRepository(_db), t => Dispatcher.Invoke(() =>
+            ocr, cfg, cache: new TranslationCacheRepository(_db),
+            onTranslated: t => Dispatcher.Invoke(() =>
             {
                 SetStatus($"dst: {t}");
                 _overlay?.ShowText(t); // T22: translated text lands on the overlay.
-            }));
+            }),
+            onToken: token => Dispatcher.Invoke(() => _overlay?.AppendToken(token)),
+            onStreamStart: () => Dispatcher.Invoke(() => _overlay?.BeginStream()),
+            onStreamEnd: () => Dispatcher.Invoke(() => _overlay?.EndStream()));
 
         // T26 scenario 10: surface pipeline/translation errors on the overlay too, so a dead API
-        // key is visible over the game instead of the overlay silently staying empty.
+        // key is visible over the game instead of the overlay silently staying empty. T39: the
+        // message carries a category (e.g. "[translate-error:auth-error: ...]"), surfaced verbatim
+        // on the overlay and forwarded to the tray tooltip.
         _pipeline.StatusChanged += s => Dispatcher.Invoke(() =>
         {
             if (s.StartsWith("[") && s.EndsWith("]")) return; // started/paused/resumed — not errors
             SetStatus(s);
-            if (s.StartsWith("[translate-error]") || s.StartsWith("[tick-error]"))
+            if (s.StartsWith("[translate-error") || s.StartsWith("[tick-error]"))
+            {
                 _overlay?.ShowText($"⚠ {s}");
+                ErrorReported?.Invoke(s);
+            }
+        });
+
+        // T40: failover to a fallback provider (or back to primary) surfaces a "degraded" marker
+        // on the overlay so the user knows the fallback is doing the work.
+        _pipeline.TranslatorFailover += name => Dispatcher.Invoke(() =>
+        {
+            _overlay?.ShowText(name == "primary" ? "✅ back on primary" : $"⚠ degraded: {name}");
         });
         return _pipeline;
     }
+
+    /// <summary>T39: raised when the pipeline reports a categorized (or tick) error. App wires it
+    /// to the tray tooltip.</summary>
+    public event Action<string>? ErrorReported;
 
     private void SetButtons(bool running, bool paused)
     {

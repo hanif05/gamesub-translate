@@ -26,8 +26,10 @@ public sealed class Database
     /// <summary>Creates the DB file and all tables if they don't exist. Safe to call at every startup.</summary>
     public void EnsureSchema()
     {
-        var dir = Path.GetDirectoryName(DbPath)!;
-        Directory.CreateDirectory(dir);
+        // In-memory SQLite (":memory:" or shared-cache URIs) has no parent directory —
+        // skip the mkdir to keep the schema-init path testable without a tmp file.
+        var dir = Path.GetDirectoryName(DbPath);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
         using var conn = Open();
         using var cmd = conn.CreateCommand();

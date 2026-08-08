@@ -6,6 +6,17 @@ public enum OcrEngineKind
     VisionAi,
 }
 
+/// <summary>T40: one translation provider endpoint. Users can add a fallback so a dead primary
+/// auto-switches to a backup (see TranslationClient failover). The legacy ApiKey/BaseUrl/Model
+/// fields on AppSettings remain the primary provider for back-compat.</summary>
+public sealed class ProviderConfig
+{
+    public string Name { get; set; } = "";
+    public string? BaseUrl { get; set; }
+    public string? ApiKey { get; set; }
+    public string? Model { get; set; }
+}
+
 public sealed class AppSettings
 {
     public string? ApiKey { get; set; }
@@ -14,6 +25,16 @@ public sealed class AppSettings
     public string SourceLang { get; set; } = "auto";
     public string TargetLang { get; set; } = "id";
     public int CaptureIntervalMs { get; set; } = 800;
+
+    // T33: adaptive capture interval. After IdleActivationThreshold frames with no change,
+    // the loop backs off to IdleCaptureIntervalMs (default 3000) to save CPU while the
+    // subtitle is still. Any change resets to CaptureIntervalMs.
+    public int IdleCaptureIntervalMs { get; set; } = 3000;
+    public int IdleActivationThreshold { get; set; } = 3;
+    // Window in ms before idle mode engages even if threshold isn't met — keeps the loop
+    // responsive when frames are technically different (anti-aliasing jitter) but semantically idle.
+    public int IdleActivationWindowMs { get; set; } = 5000;
+
     public OcrEngineKind OcrEngine { get; set; } = OcrEngineKind.Tesseract;
     public string OverlayFontFamily { get; set; } = "Segoe UI";
     public double OverlayFontSize { get; set; } = 20;
@@ -31,6 +52,10 @@ public sealed class AppSettings
     // Last-active state (T9) so the active region survives restarts.
     public int? ActiveProfileId { get; set; }
     public int? ActiveRegionId { get; set; }
+
+    /// <summary>T40: fallback providers tried in order after the primary fails 3x consecutive
+    /// (Network/Provider only — Auth/BadRequest/RateLimit never failover).</summary>
+    public List<ProviderConfig> Providers { get; set; } = new();
 
     public bool TranslationEnabled =>
         !string.IsNullOrWhiteSpace(ApiKey) &&
