@@ -49,7 +49,7 @@ Fase 4 **memoles, mengemas, dan memvalidasi**. TIDAK refactor besar — desain s
 ### FASE 4.A — Installer & Distribution
 
 #### T43. Inno Setup installer script
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit ea2309c).
 **Deskripsi**: Hand-rolled installer pakai Inno Setup (free, portable, no NuGet). Output `GameSubTranslate-Setup-1.0.0.exe` di folder `installer/`.
 - Include semua output build: `GameSubTranslate.App.exe`, `GameSubTranslate.Core.dll`, dependencies (`Tesseract.dll`, `assets/tessdata/`, SQLite native jika ada).
 - Pilihan install path default: `%ProgramFiles%\GameSubTranslate\`.
@@ -72,7 +72,7 @@ Fase 4 **memoles, mengemas, dan memvalidasi**. TIDAK refactor besar — desain s
 **Depends on**: — (independent, T44 butuh installer sudah ada).
 
 #### T44. Release build configuration
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit c7750e2).
 **Deskripsi**: Tambah konfigurasi `Release` ke solution + tweak `GameSubTranslate.App.csproj`:
 - `dotnet publish -c Release` menghasilkan single-folder output yang siap dikemas installer.
 - Enable optimizations (`<Optimize>true</Optimize>`, `<PublishReadyToRun>true</PublishReadyToRun>`).
@@ -89,7 +89,7 @@ Fase 4 **memoles, mengemas, dan memvalidasi**. TIDAK refactor besar — desain s
 **Depends on**: T43 (installer butuh output publish).
 
 #### T45. First-run welcome + setup wizard
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit 136d913).
 **Deskripsi**: Saat app pertama kali jalan (`%APPDATA%\GameSubTranslate\settings.json` belum ada), tampilkan wizard 3 langkah:
 1. **API Setup**: jelaskan butuh API key + base URL + model, link ke "How to get API key" (OpenAI / OpenRouter doc), tombol "Skip — pakai nanti".
 2. **Target language**: pilih dari dropdown (default id).
