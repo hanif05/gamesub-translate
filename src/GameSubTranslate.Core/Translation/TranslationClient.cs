@@ -228,7 +228,7 @@ public class TranslationClient
         if (string.IsNullOrWhiteSpace(text)) { yield return text; yield break; }
         if (!IsConfigured) { yield break; }
 
-        var systemPrompt = $"Kamu adalah mesin penerjemah subtitle game. Terjemahkan teks berikut dari {_sourceLang} ke {_targetLang}. Jawab HANYA dengan hasil terjemahan, tanpa penjelasan tambahan, tanpa tanda kutip.";
+        var systemPrompt = $"Kamu adalah mesin penerjemah subtitle game. Terjemahkan teks berikut dari {_sourceLang} ke {_targetLang}. Jawab HANYA dengan hasil terjemahan, tanpa penjelasan tambahan, tanpa tanda kutip, tanpa chain-of-thought.";
         var ep = Current;
         var req = new
         {
@@ -274,6 +274,12 @@ public class TranslationClient
         var stream = await resp.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream, Encoding.UTF8);
 
+        // Reasoning models (qwen3, deepseek-r1) stream the <think>...</think> block BEFORE the
+        // real answer. Skip every token while we're inside one. State stays across chunks so a
+        // tag split across two SSE lines still parses correctly.
+        bool insideThinking = false;
+        string buffered = "";
+
         while (!reader.EndOfStream)
         {
             ct.ThrowIfCancellationRequested();
@@ -290,9 +296,46 @@ public class TranslationClient
             if (payload == "[DONE]") yield break;
 
             var token = TryExtractToken(payload);
-            if (token.Length > 0) yield return token;
+            if (token.Length == 0) continue;
+
+            // Append then re-scan: a single token might contain both the close tag and the
+            // first real answer chars (e.g. "</think>Halo"). Split on the tag, drop the head,
+            // keep the tail.
+            buffered += token;
+            while (buffered.Length > 0)
+            {
+                if (insideThinking)
+                {
+                    int closeIdx = IndexOfIgnoreCase(buffered, "</think>");
+                    if (closeIdx < 0)
+                    {
+                        // Still inside a thinking block; consume everything we have so far.
+                        buffered = "";
+                        break;
+                    }
+                    buffered = buffered[(closeIdx + "</think>".Length)..];
+                    insideThinking = false;
+                    continue;
+                }
+                int openIdx = IndexOfIgnoreCase(buffered, "<think>");
+                if (openIdx < 0)
+                {
+                    if (buffered.Length > 0) yield return buffered;
+                    buffered = "";
+                    break;
+                }
+                // Emit anything before the open tag, then drop into "inside" mode.
+                if (openIdx > 0) yield return buffered[..openIdx];
+                buffered = buffered[(openIdx + "<think>".Length)..];
+                insideThinking = true;
+            }
         }
     }
+
+    // string.IndexOf with ignore-case + Ordinal isn't a single call in C# 12 iterators, so
+    // wrap it. Returns -1 if not found.
+    private static int IndexOfIgnoreCase(string s, string needle)
+        => s.IndexOf(needle, StringComparison.OrdinalIgnoreCase);
 
     // Local helpers — kept out of the iterator body so try/catch and ref-span usage don't
     // collide with C# 12's yield restrictions (no yield in try/catch; no Span/ReadOnlySpan
@@ -360,7 +403,7 @@ public class TranslationClient
 
     private async Task<string?> TranslateOnceAsync(string text, CancellationToken ct)
     {
-        var systemPrompt = $"Kamu adalah mesin penerjemah subtitle game. Terjemahkan teks berikut dari {_sourceLang} ke {_targetLang}. Jawab HANYA dengan hasil terjemahan, tanpa penjelasan tambahan, tanpa tanda kutip.";
+        var systemPrompt = $"Kamu adalah mesin penerjemah subtitle game. Terjemahkan teks berikut dari {_sourceLang} ke {_targetLang}. Jawab HANYA dengan hasil terjemahan, tanpa penjelasan tambahan, tanpa tanda kutip, tanpa chain-of-thought.";
         var ep = Current;
         var req = new
         {
@@ -390,7 +433,7 @@ public class TranslationClient
         if (body?.Choices is null || body.Choices.Count == 0)
             throw new TranslationException(
                 $"Translation API returned a {GetMediaType(resp)} without a content choice", ErrorCategory.Provider);
-        return body.Choices[0]?.Message?.Content?.Trim();
+        return TextCleaning.StripThinking(body.Choices[0]?.Message?.Content);
     }
 
     private sealed class ChatResponse

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using GameSubTranslate.Config;
+using GameSubTranslate.Translation;
 
 namespace GameSubTranslate.Ocr;
 
@@ -16,9 +17,12 @@ namespace GameSubTranslate.Ocr;
 public sealed class VisionAiOcrEngine : IOcrEngine, IDisposable
 {
     private const int MaxAttempts = 4; // initial + 3 retries
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
+    // Reasoning-capable vision models (qwen3-vl, etc.) can take 20-30s for the first token while
+    // they think; 10s was starving them. Bumped from 10s — worst-case retry budget is now ~95s
+    // instead of ~47s. Acceptable because capture interval is on the order of seconds.
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
     private const string SystemPrompt =
-        "Ekstrak teks dari gambar ini. Jawab HANYA dengan teks hasil ekstraksi, tanpa penjelasan.";
+        "Ekstrak teks dari gambar ini. Jawab HANYA dengan teks hasil ekstraksi, tanpa penjelasan, tanpa chain-of-thought, tanpa markdown code block.";
 
     private readonly HttpClient _http;
     private readonly string _baseUrl;
@@ -117,7 +121,7 @@ public sealed class VisionAiOcrEngine : IOcrEngine, IDisposable
         }
 
         var body = await resp.Content.ReadFromJsonAsync<VisionResponse>(cancellationToken: ct);
-        return body?.Choices?.FirstOrDefault()?.Message?.Content?.Trim() ?? "";
+        return TextCleaning.StripThinking(body?.Choices?.FirstOrDefault()?.Message?.Content);
     }
 
     public void Dispose() => _http.Dispose();
