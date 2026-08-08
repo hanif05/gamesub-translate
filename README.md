@@ -10,8 +10,8 @@ Lihat [`PRD-Auto-Translate-Subtitle-Game.md`](PRD-Auto-Translate-Subtitle-Game.m
 |---|---|---|
 | 1 — Prototype (console, end-to-end) | ✅ Done | `docs/tasks/TASKS-fase-1-prototype.md` |
 | 2 — MVP Overlay (WPF click-through) | ✅ Done | `docs/tasks/TASKS-fase-2-mvp-overlay.md` |
-| 3 — Optimisasi | ⏳ Next | `docs/tasks/TASKS-fase-3-optimisasi.md` |
-| 4 — Polish | ⏳ Pending | |
+| 3 — Optimisasi (testing, caching, streaming, failover) | ✅ Done | `docs/tasks/TASKS-fase-3-optimisasi.md` |
+| 4 — Polish & Packaging (installer, UI polish, presets) | ⏳ Next | `docs/tasks/TASKS-fase-4-polish.md` |
 
 ## Tech Stack
 
@@ -31,14 +31,20 @@ Lihat [`PRD-Auto-Translate-Subtitle-Game.md`](PRD-Auto-Translate-Subtitle-Game.m
 .
 ├── src/
 │   ├── GameSubTranslate.Prototype/   ← console end-to-end (testing CLI tanpa UI)
-│   ├── GameSubTranslate.Core/        ← classlib: Capture, Ocr, Pipeline, Translation, Config, Storage, Profiles, Cache
-│   └── GameSubTranslate.App/         ← WPF: MainWindow, ProfileEdit, RegionSelector, Overlay, Settings, Hotkeys
+│   ├── GameSubTranslate.Core/        ← classlib: Capture, Ocr, Pipeline, Translation, Config, Storage, Profiles, Cache, Logging
+│   └── GameSubTranslate.App/         ← WPF: MainWindow, ProfileEdit, RegionSelector, Overlay, Settings, Hotkeys, Onboarding
+├── tests/
+│   └── GameSubTranslate.Core.Tests/  ← xUnit (79 tests: ChangeDetector, TranslationClient, SettingsStore, TranslationCache, streaming, FileLogger, Ocr engines, failover)
 ├── assets/tessdata/                  eng.traineddata
+├── installer/                        (Fase 4) Inno Setup script + publish output
 ├── docs/
 │   ├── PRD-Auto-Translate-Subtitle-Game.md
+│   ├── game-presets.md               (Fase 4) preset region per game populer
 │   └── tasks/
 │       ├── TASKS-fase-1-prototype.md
-│       └── TASKS-fase-2-mvp-overlay.md
+│       ├── TASKS-fase-2-mvp-overlay.md
+│       ├── TASKS-fase-3-optimisasi.md
+│       └── TASKS-fase-4-polish.md
 ├── GameSubTranslate.sln
 ├── CLAUDE.md                         ruleset untuk AI assistant
 └── README.md
@@ -49,7 +55,8 @@ Lihat [`PRD-Auto-Translate-Subtitle-Game.md`](PRD-Auto-Translate-Subtitle-Game.m
 ### Prasyarat
 
 - Windows 10 1903+ (build 18362) — `Windows.Graphics.Capture` requirement
-- .NET 8 SDK
+- .NET 8 SDK (build & dev)
+- **Untuk runtime end-user (Fase 4 installer)**: .NET 8 Desktop Runtime — installer akan cek dan prompt download link resmi kalau belum ada
 - API key endpoint OpenAI-compatible (OpenAI, OpenRouter, Groq, Ollama, dsb)
 
 ### Build
@@ -92,10 +99,10 @@ dotnet run --project src/GameSubTranslate.Prototype -- --x 0 --y 800 --w 1280 --
 
 ## Limitasi
 
-- OCR English only (`eng.traineddata`). Bahasa lain = tambah `.traineddata` ke `assets/tessdata/`.
-- Capture region manual per game (auto-detect region via AI — Fase 3+).
-- Model provider `:free` (OpenRouter) mudah kena rate limit → API call gagal beruntun (retry + overlay error status sudah ditangani).
-- Latency end-to-end dominan waktu LLM API (~1.5–5s di verifikasi), cache hit ~0-1ms.
+- OCR English only (`eng.traineddata`). Bahasa lain = tambah `.traineddata` ke `assets/tessdata/`. Vision AI OCR (Fase 3) bisa handle font stylized multibahasa tanpa file tessdata.
+- Capture region manual per game (auto-detect region via AI — Fase 5+).
+- Model provider `:free` (OpenRouter) mudah kena rate limit → API call gagal beruntun. Retry + failover ke fallback provider + categorized overlay error sudah ditangani (Fase 3 T12, T39, T40).
+- Latency end-to-end dominan waktu LLM API. Streaming mode (Fase 3 T36) turunkan first-token ke <1s; full response ~1.5–5s. Cache hit (exact + fuzzy) ~0-1ms.
 
 ## Self-checks
 
@@ -106,7 +113,22 @@ Verifikasi otomatis per task, jalan tanpa test framework:
 dotnet run --project src/GameSubTranslate.Prototype -- --selfcheck-t3
 # App (WPF) — butuh display session
 dotnet run --project src/GameSubTranslate.App -- --selfcheck-t14
+
+# Fase 3 integration smoke (T35 long-running profile, T36 streaming, T37 fuzzy, dst)
+for t in t35 t36 t37 t38 t39 t40 t41; do
+  "/d/Coding/game-sub-translate/src/GameSubTranslate.App/bin/Debug/net8.0-windows10.0.19041.0/GameSubTranslate.App.exe" "--selfcheck-$t"
+done
 ```
+
+## Tests
+
+xUnit suite (79 tests, sejak Fase 3):
+
+```bash
+dotnet test
+```
+
+Coverage: `ChangeDetector`, `TranslationClient` (retry/timeout/error kategori/failover), `TranslationStream`, `SettingsStore` (DPAPI + JSON), `TranslationCache` (exact + fuzzy + Levenshtein), `FileLogger` (rotation), `TesseractOcrEngine` + `VisionAiOcrEngine`.
 
 ## Contributing
 
