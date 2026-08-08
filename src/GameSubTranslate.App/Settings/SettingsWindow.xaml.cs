@@ -15,6 +15,7 @@ using TextBox = System.Windows.Controls.TextBox;
 using Button = System.Windows.Controls.Button;
 using ComboBox = System.Windows.Controls.ComboBox;
 using Brush = System.Windows.Media.Brush;
+using FontFamily = System.Windows.Media.FontFamily;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using MessageBox = System.Windows.MessageBox;
 using Brushes = System.Windows.Media.Brushes;
@@ -30,7 +31,7 @@ public partial class SettingsWindow : Window
 {
     private readonly OverlayWindow? _overlay;
     private readonly ProfileRepository _repo;
-    private readonly AppSettings _settings; // working copy — MainWindow's instance stays untouched until Save
+    private AppSettings _settings; // working copy — MainWindow's instance stays untouched until Save
     private readonly Database _db;
     private bool _capturingHotkey;
     private string _hotkeySetting = "";
@@ -60,8 +61,20 @@ public partial class SettingsWindow : Window
         RefreshProfiles();
         BuildPalette();
 
-        FontSizeSlider.ValueChanged += (_, _) => FontSizeText.Text = FontSizeSlider.Value.ToString("0");
-        OpacitySlider.ValueChanged += (_, _) => OpacityText.Text = OpacitySlider.Value.ToString("0.00");
+        FontSizeSlider.ValueChanged += (_, _) =>
+        {
+            FontSizeText.Text = FontSizeSlider.Value.ToString("0");
+            UpdatePreview();
+        };
+        OpacitySlider.ValueChanged += (_, _) =>
+        {
+            OpacityText.Text = OpacitySlider.Value.ToString("0.00");
+            UpdatePreview();
+        };
+        UpdatePreview();
+
+        // T48: live validation on interval change.
+        IntervalBox.TextChanged += (_, _) => ValidateInterval();
 
         // T44: About tab reads version from version.txt next to the exe (shipped by csproj).
         // Fall back to a single dash on dev runs that pre-date T44.
@@ -130,6 +143,33 @@ public partial class SettingsWindow : Window
 
     private ProviderConfig? SelectedProvider => ProviderList.SelectedItem as ProviderConfig;
 
+    // T48: reorder fallback providers. The list order IS the failover order (T40).
+    private void ProviderUp_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedProvider is not { } sel) return;
+        var i = _settings.Providers.IndexOf(sel);
+        if (i > 0)
+        {
+            _settings.Providers.RemoveAt(i);
+            _settings.Providers.Insert(i - 1, sel);
+            RefreshProviders();
+            ProviderList.SelectedItem = sel;
+        }
+    }
+
+    private void ProviderDown_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedProvider is not { } sel) return;
+        var i = _settings.Providers.IndexOf(sel);
+        if (i >= 0 && i < _settings.Providers.Count - 1)
+        {
+            _settings.Providers.RemoveAt(i);
+            _settings.Providers.Insert(i + 1, sel);
+            RefreshProviders();
+            ProviderList.SelectedItem = sel;
+        }
+    }
+
     // ---- About / Logs ----
 
     private void OpenLogsFolder_Click(object sender, RoutedEventArgs e)
@@ -144,6 +184,57 @@ public partial class SettingsWindow : Window
             Arguments = dir,
             UseShellExecute = true,
         });
+    }
+
+    /// <summary>T48: factory-reset every editable field (preserves API key — typing it back is annoying).</summary>
+    private void ResetDefaults_Click(object sender, RoutedEventArgs e)
+    {
+        var ok = MessageBox.Show(this,
+            "Reset all settings to factory defaults? Your API key will be preserved.",
+            "Reset to Defaults",
+            MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+        if (ok != MessageBoxResult.OK) return;
+        var apiKey = _settings.ApiKey;
+        _settings = new AppSettings { ApiKey = apiKey };
+        LoadSettings();
+        UpdatePreview();
+        ValidateInterval();
+    }
+
+    // ---- T48: Overlay live preview + validation ----
+
+    /// <summary>Pushes current Overlay tab values into the preview Border — no Save needed.</summary>
+    private void UpdatePreview()
+    {
+        PreviewText.FontFamily = FontFor(FontFamilyBox.Text);
+        var size = FontSizeSlider.Value;
+        PreviewText.FontSize = size;
+        PreviewText.Foreground = BrushFor(string.IsNullOrWhiteSpace(TextColorBox.Text) ? "#FFFFFF" : TextColorBox.Text.Trim());
+        PreviewCard.Background = BrushFor(string.IsNullOrWhiteSpace(BgColorBox.Text) ? "#CC000000" : BgColorBox.Text.Trim());
+        // Opacity is multiplicative — apply on the inner element so the border stays opaque-ish.
+        PreviewText.Opacity = OpacitySlider.Value;
+    }
+
+    private void OverlayStyle_Changed(object sender, TextChangedEventArgs e) => UpdatePreview();
+
+    private void IntervalBox_Changed(object sender, TextChangedEventArgs e) => ValidateInterval();
+
+    private void ValidateInterval()
+    {
+        if (int.TryParse(IntervalBox.Text, out var n) && n >= 100)
+        {
+            IntervalWarn.Text = "";
+        }
+        else
+        {
+            IntervalWarn.Text = "Must be a number ≥ 100 ms";
+        }
+    }
+
+    private static FontFamily FontFor(string name)
+    {
+        try { return string.IsNullOrWhiteSpace(name) ? new FontFamily("Segoe UI") : new FontFamily(name); }
+        catch { return new FontFamily("Segoe UI"); }
     }
 
     // ---- API & Model ----
