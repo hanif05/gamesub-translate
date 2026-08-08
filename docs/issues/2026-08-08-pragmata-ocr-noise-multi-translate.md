@@ -114,7 +114,23 @@ Some cycles produce noise-only output ("Hugh De\nfl A"). Add a check: if after n
 - Subtitle-frame detection ("only OCR when the subtitle is fully drawn"). Possible but a much larger refactor; not justified by this single game.
 - Cache key hashing / dedup. Fix 2 + 3 already collapse identical dialog lines to one API call.
 
-## Verification
+## Status
+
+- **Fix 1 (region):** user-side, belum diterapkan.
+- **Fix 2 + 3 + 4 (code):** DITERAPKAN 2026-08-08. Detail implementasi:
+  - `NormalizeForCache` ditaruh di `Translation/TextCleaning.cs` (bukan method private di pipeline — file sudah shared + ada test file di sana), public internal-static.
+  - Normalisasi 3 layer: drop baris noise (ratio huruf + panjang word + maxword), ambil cuma baris dialog dominan (terpanjang), strip leading short-word noise + trailing fragment.
+  - `TranslatePipeline.cs`: loop compare pakai normalized string (`norm != _lastText`), `CaptureOnceAsync` set `_lastText` normalized, `_cache.Put` pakai normalized key.
+  - `GetFuzzy` default `0.85` → `0.65` (Fix 3).
+  - Test: `tests/GameSubTranslate.Core.Tests/Translation/NormalizeForCacheTests.cs` (4 test, semua pass). Full suite 91/91 pass.
+- **Catatan:** "Done aren't you tired?" vs "Diana, aren't you tired?" tidak bisa disamakan oleh normalisasi (salah-OCR huruf pertama, beda kata). Keduanya jadi 2 key beda — tapi sim Levenshtein ~0.9 → `GetFuzzy` (Fix 3) tangkap, cache hit, tanpa API call tambahan. Jadi per dialog line: cycle 1+2 collapse ke 1 key (1 translation), cycle 3 ke key lain tapi fuzzy hit.
+
+## Files touched (actual)
+
+- `src/GameSubTranslate.Core/Translation/TextCleaning.cs` — added `NormalizeForCache` (+ helpers)
+- `src/GameSubTranslate.Core/Pipeline/TranslatePipeline.cs` — normalized `_lastText` compare, cache key, garbage-drop
+- `src/GameSubTranslate.Core/Cache/TranslationCacheRepository.cs` — `GetFuzzy` default threshold `0.85` → `0.65`
+- `tests/GameSubTranslate.Core.Tests/Translation/NormalizeForCacheTests.cs` — new tests
 
 After Fix 1 (region) is applied, the next Pragmata run should show in the log:
 - Same `[OCR] recognize` entries but with much shorter, cleaner text
@@ -128,3 +144,5 @@ If `[OCR] recognize` entries are still noisy after region tightening, ship Fix 2
 - `src/GameSubTranslate.Core/Pipeline/TranslatePipeline.cs` — add `NormalizeForCache`, use for `_lastText` compare + cache key, drop garbage lines
 - `src/GameSubTranslate.Core/Cache/TranslationCacheRepository.cs` — change `GetFuzzy` default threshold `0.85` → `0.65`
 - `tests/GameSubTranslate.Core.Tests/Pipeline/NormalizeForCacheTests.cs` — new tests for the helper
+
+_(lihat "Files touched (actual)" di atas — lokasi test beda dari rencana: `Translation/` bukan `Pipeline/` karena helper ditaruh di `TextCleaning.cs`.)

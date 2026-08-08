@@ -170,8 +170,11 @@ public sealed class TranslatePipeline : IDisposable
         if (png.Length == 0) return null;
         _lastPng = png;
         string text = await _ocr.RecognizeAsync(png, ct);
-        if (string.IsNullOrWhiteSpace(text)) return null;
-        _lastText = text;
+        // Fix 2: store the normalized form so the loop's exact-match compare and the manual
+        // trigger share one key. Garbage-only frames are dropped before a translation fires.
+        string norm = TextCleaning.NormalizeForCache(text);
+        if (norm.Length == 0) return null;
+        _lastText = norm;
         string? translated = await TranslateAsync(text, ct);
         if (translated is not null) _onTranslated(translated);
         return translated;
@@ -225,19 +228,23 @@ public sealed class TranslatePipeline : IDisposable
                             _lastChangeAt = DateTime.UtcNow;
                             _unchangedCount = 0;
                             string text = await _ocr.RecognizeAsync(png, ct);
-                            if (!string.IsNullOrWhiteSpace(text) && text != _lastText)
+                            // Fix 2: compare the *normalized* text so frame-to-frame OCR noise on
+                            // the same dialog line collapses to one key — one translation, not 3.
+                            // Fix 4: garbage-only frames normalize to "" and are dropped.
+                            string norm = TextCleaning.NormalizeForCache(text);
+                            if (norm.Length > 0 && norm != _lastText)
                             {
-                                _lastText = text;
-                                _logger?.Info("OCR", $"recognize text=\"{Truncate(text, 120)}\"");
+                                _lastText = norm;
+                                _logger?.Info("OCR", $"recognize text=\"{Truncate(norm, 120)}\"");
                                 await TranslateAndShowAsync(text, ct);
                             }
-                            else if (!string.IsNullOrWhiteSpace(text))
+                            else if (norm.Length > 0)
                             {
-                                _logger?.Info("OCR", $"skip (same as last) text=\"{Truncate(text, 120)}\"");
+                                _logger?.Info("OCR", $"skip (same as last) text=\"{Truncate(norm, 120)}\"");
                             }
                             else
                             {
-                                _logger?.Info("OCR", "skip (empty/whitespace)");
+                                _logger?.Info("OCR", "skip (empty/garbage)");
                             }
                         }
                         else
@@ -289,7 +296,7 @@ public sealed class TranslatePipeline : IDisposable
             Console.WriteLine($"[latency] {sw.Elapsed.TotalMilliseconds:F0}ms \"{text}\" -> \"{translated}\"");
             _logger?.Info("Translate", $"done {sw.Elapsed.TotalMilliseconds:F0}ms src=\"{Truncate(text, 80)}\" -> \"{Truncate(translated, 80)}\"");
             if (translated is not null && _cache is not null)
-                _cache.Put(text, translated, _translator.TargetLang);
+                _cache.Put(TextCleaning.NormalizeForCache(text), translated, _translator.TargetLang);
             return translated;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -423,7 +430,8 @@ public sealed class TranslatePipeline : IDisposable
         if (full.Length > 0)
         {
             _onTranslated(full);
-            if (_cache is not null) _cache.Put(text, full, _translator.TargetLang);
+            // Fix 2: store under the normalized key so future noise-variant frames hit the cache.
+            if (_cache is not null) _cache.Put(TextCleaning.NormalizeForCache(text), full, _translator.TargetLang);
         }
         return full.Length > 0 ? full : null;
     }
