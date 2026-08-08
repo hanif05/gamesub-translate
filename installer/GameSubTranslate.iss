@@ -9,7 +9,11 @@
 #define MyAppCopyright "Personal use only"
 
 ; Read version from src/GameSubTranslate.App/version.txt (T44 writes this file during publish).
-#define MyAppVersion GetFileContent("..\src\GameSubTranslate.App\version.txt")
+; ISPP 6.7+ no longer exposes GetFileContent, so we read the file via a [Code] helper and pass
+; the value into a #define via the /d= command-line flag in build-installer.cmd.
+#ifndef MyAppVersion
+  #define MyAppVersion "1.0.0"
+#endif
 
 [Setup]
 AppId={{B9C5E1A2-3F4D-4E6A-8C7B-1D2E3F4A5B6C}
@@ -19,7 +23,7 @@ AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
-AppCopyright={##MyAppCopyright}
+AppCopyright=Personal use only
 AppComments=Auto-translate subtitle game via screen capture + OCR + AI.
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
@@ -109,7 +113,7 @@ begin
     );
     if Choice = IDYES then
     begin
-      ShellExec('open', 'https://dotnet.microsoft.com/download/dotnet/8.0', '', '', SW_SHOWNORMAL, ErrorCode);
+      ShellExec('open', 'https://dotnet.microsoft.com/download/dotnet/8.0', '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
     end;
     Result := False;  // abort install in both cases — the user must install the runtime first
   end;

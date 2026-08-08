@@ -20,8 +20,16 @@ if not exist "publish-output\GameSubTranslate.App.exe" (
   exit /b 1
 )
 
+REM Read version from the same file T44 uses. Trim CR/LF + whitespace so the define stays clean.
+set "VERSION="
+for /f "usebackq delims=" %%V in ("..\src\GameSubTranslate.App\version.txt") do (
+  if not defined VERSION set "VERSION=%%V"
+)
+if not defined VERSION set "VERSION=1.0.0"
+echo [build-installer] version=%VERSION%
+
 echo [build-installer] compiling GameSubTranslate.iss ...
-"%ISCC%" GameSubTranslate.iss
+"%ISCC%" /dMyAppVersion="%VERSION%" GameSubTranslate.iss
 if errorlevel 1 (
   echo [build-installer] ISCC failed.
   exit /b 1
