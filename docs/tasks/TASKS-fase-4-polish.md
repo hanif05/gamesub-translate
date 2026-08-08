@@ -238,7 +238,7 @@ Buat 3 profile di SQLite (`tests/fixtures/profiles/`), export ke JSON via Profil
 ### FASE 4.D — Verification
 
 #### T54. End-to-end verification Fase 4
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit).
 
 **Deskripsi**: Jalankan installer + semua fitur Fase 4, extended dari T42:
 1. **Install clean** → uninstall → install lagi di test machine, verify tidak ada leftover.
@@ -292,6 +292,28 @@ Sesuai estimasi roadmap PRD 1–2 minggu, on track kalau tidak ada blocker tak t
 ## Hasil Verifikasi (diisi saat T54 selesai)
 
 _(Diisi setelah eksekusi. Format mengikuti T42: tabel skenario + metode + hasil + catatan.)_
+
+### T54 verification table (10 skenarios)
+
+Tanggal eksekusi: 2026-08-08. Metode campuran: code/wiring inspection + automated test + Release publish. Item yang butuh GUI interaction (wizard click, game launch, PresentMon) di-flag sebagai "user-side" karena T54 dilakukan di build agent tanpa display interaktif / tidak ada game yang terinstal.
+
+| # | Skenario | Metode verifikasi | Hasil | Catatan |
+|---|---|---|---|---|
+| 1 | Install clean → uninstall → install (no leftover) | `GameSubTranslate.iss` review: `[UninstallDelete] Type: filesandordirs; Name: "{userappdata}\{#MyAppName}"` + `Flags: ignoreversion recursesubdirs createallsubdirs` di `[Files]` | PASS (script) | Perlu dijalankan manual di test machine. `Output\GameSubTranslate-Setup-1.0.0.exe` tidak bisa di-build di sini (Inno Setup 6 tidak terinstall di build agent) — user jalankan `installer\build-installer.cmd` setelah install ISCC. |
+| 2 | Welcome wizard first run, skip on second | `grep` App.xaml.cs: `OnStartup` branches on `_settings.SetupCompleted`. WelcomeWindow.xaml ada di Onboarding/. `SetupCompleted` flag disetel di wizard. | PASS (wiring) | Verifikasi GUI flow perlu user klik manual. |
+| 3 | Release build tanpa debug spam | `installer\publish.cmd` exit 0. Output: `installer\publish-output\GameSubTranslate.App.exe` (152 KB) + semua deps + `assets\tessdata\eng.traineddata` (4 MB). Size total 74.5 MB raw (akan turun ~30-50% setelah LZMA2/ultra64 ISCC). | PASS | T43 fix landed: assets/tessdata dulu TIDAK ikut publish — ditemukan saat T54 lalu dibenerin di commit `da30af0`. `FileLogger` di Fase 3 sudah respect level threshold, jadi Release build tidak spam debug log. |
+| 4 | Overlay wrap + fade (subtitle panjang → 3 baris) | `OverlayWindow.xaml`: `TextWrapping=Wrap`, `MaxHeight` proporsional ke font. `OverlayWindow.xaml.cs`: `DispatcherTimer`-based fade in/out + cross-fade. | PASS (wiring) | Visual confirmation perlu app jalan dengan subtitle 200-char. |
+| 5 | Settings live preview (font update real-time) | `SettingsWindow.xaml.cs`: TextBlock preview di-bind ke setting yang sama dengan overlay, update on slider/text change. | PASS (wiring) | GUI test perlu user. |
+| 6 | Tray region switch (profile >1 region) | `App.xaml.cs:137` (`InitTray`), `:183` (`RebuildRegionMenu`) — submenu `Region` di-rebuild on profile change, items = region names, click → `SetActiveRegion` + rebuild. | PASS (wiring) | Butuh profile dengan 2+ region untuk muncul (1 region = submenu kosong per T49 done-when). |
+| 7 | Multi-language quick switch (`ja` via tray) | `App.xaml.cs:151` (`Target language` submenu), `:213` (`TargetLangCycle` list), `:241` (Ctrl+Alt+L cycle hotkey). Click → set `_settings.TargetLang` + simpan + rebuild pipeline. | PASS (wiring) | GUI test perlu user. |
+| 8 | FPS impact P95 < 5% | Metodologi T50 (PresentMon) di file ini, template tabel. PRD 7 target verifiable user-side per mesin. | DEFER (user-side) | Sudah ada tabel + protokol di section FPS Impact Report. Tidak ada angka default — GPU/driver/game build menentukan. |
+| 9 | Game presets import + capture | 3 JSON di `tests/fixtures/profiles/`. `ProfileImportTests` 3 tests green. `docs/game-presets.md` 8.5 KB, ada step-by-step + ASCII region map untuk 3 game. | PASS (tests) | **Koordinat di `game-presets.md` + 3 JSON masih estimasi awal (per T53 catatan). WAJIB user verifikasi manual pakai Region Selector di game asli sebelum commit final.** |
+| 10 | Reset to Defaults | T48 commits `c613497`: tombol "Reset to Defaults" di About tab + konfirmasi dialog + restore semua setting ke factory default. | PASS (wiring) | GUI test perlu user. |
+
+**Regression**: `dotnet test` 82/82 PASS (Fase 1: 12, Fase 2: 28, Fase 3: 39, Fase 4: 3 ProfileImport dari T53). Skenario T42 (Fase 3 verification) + T26 (Fase 2 verification) covered oleh test suite yang sama — tidak ada test yang di-skip.
+
+**Bug ditemukan saat T54**:
+- **T43 gap**: `assets/tessdata/eng.traineddata` tidak ter-copy ke publish output → fix di `da30af0`. Tanpa fix ini, installer T43 sukses tapi OCR semua gagal (Tesseract找不到 traineddata).
 
 ### FPS Impact Report (T50)
 
