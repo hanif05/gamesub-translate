@@ -7,6 +7,7 @@ using GameSubTranslate.Ocr;
 using GameSubTranslate.Pipeline;
 using GameSubTranslate.Profiles;
 using GameSubTranslate.Storage;
+using GameSubTranslate.Translation;
 
 namespace GameSubTranslate.App;
 
@@ -138,6 +139,34 @@ public partial class MainWindow : Window
         else
         {
             Refresh(); // profile list stale (created/deleted elsewhere) → reload + try select
+        }
+    }
+
+    /// <summary>T49: tray-facing accessors. App reads these to build the tray tooltip + region submenu.</summary>
+    public string? ActiveProfileName() => _service.ActiveProfile?.Name;
+
+    public IReadOnlyList<CaptureRegion> ActiveProfileRegions()
+        => _service.ActiveProfile?.Regions ?? (IReadOnlyList<CaptureRegion>)Array.Empty<CaptureRegion>();
+
+    public int? ActiveRegionId() => _service.ActiveRegionId;
+
+    public void SetActiveRegion(int regionId) => _service.SetActiveRegion(regionId);
+
+    /// <summary>T49: forward provider failover signals to the App so it can repaint the tray icon.</summary>
+    public event Action<string>? TranslatorFailoverSignal;
+
+    /// <summary>T49: current translation client (null when no pipeline yet). Used by App to
+    /// subscribe to FailoverChanged without poking at internals.</summary>
+    public TranslationClient? CurrentClient
+    {
+        get
+        {
+            // Pipeline keeps the translator private; reflect once. Avoids adding a public Client
+            // getter to Core just for tray wiring.
+            if (_pipeline is null) return null;
+            var f = typeof(TranslatePipeline).GetField("_translator",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            return f?.GetValue(_pipeline) as TranslationClient;
         }
     }
 
@@ -283,6 +312,7 @@ public partial class MainWindow : Window
         _pipeline.TranslatorFailover += name => Dispatcher.Invoke(() =>
         {
             _overlay?.ShowText(name == "primary" ? "✅ back on primary" : $"⚠ degraded: {name}");
+            TranslatorFailoverSignal?.Invoke(name); // T49: repaint tray icon to yellow.
         });
         return _pipeline;
     }
