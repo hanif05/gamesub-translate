@@ -51,6 +51,10 @@ public partial class OverlayWindow : Window
         Subtitle.Foreground = BrushFor(settings.OverlayTextColor);
         Subtitle.FontFamily = new System.Windows.Media.FontFamily(settings.OverlayFontFamily);
         Subtitle.FontSize = settings.OverlayFontSize;
+        // T46: cap to 3 lines using a MaxHeight proportional to font size. ~1.5× line-height
+        // is WPF's default, ×3 lines, plus card padding (8 top + 8 bottom). 16 is the
+        // border padding total. Anything beyond gets CharacterEllipsis (set in XAML).
+        Subtitle.MaxHeight = settings.OverlayFontSize * 1.5 * 3 + 16;
     }
 
     private static System.Windows.Media.Brush BrushFor(string hex)
