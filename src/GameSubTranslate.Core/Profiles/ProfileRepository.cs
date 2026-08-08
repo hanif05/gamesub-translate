@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Dapper;
 using GameSubTranslate.Config;
 using GameSubTranslate.Storage;
@@ -108,6 +109,28 @@ public sealed class ProfileRepository
         conn.Execute("DELETE FROM GameProfile WHERE Id=@Id", new { Id = id });
     }
 
+    // ---- T53: JSON preset import/export. Profiles are intentionally API-key-free — the
+    // translation credentials live in AppSettings (DPAPI-encrypted). A preset is geometry +
+    // language hints only.
+
+    private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
+
+    /// <summary>Serializes one profile (with regions) to JSON. Round-trips through <see cref="ImportFromJson"/>.</summary>
+    public string ExportToJson(GameProfile profile)
+    {
+        var dto = ProfileDto.FromModel(profile);
+        return JsonSerializer.Serialize(dto, JsonOpts);
+    }
+
+    /// <summary>Persists a preset JSON into the database. Returns the new profile id.</summary>
+    public int ImportFromJson(string json)
+    {
+        var dto = JsonSerializer.Deserialize<ProfileDto>(json)
+            ?? throw new ArgumentException("Empty or invalid JSON.", nameof(json));
+        var p = dto.ToModel();
+        return Create(p);
+    }
+
     private static void Validate(GameProfile p)
     {
         if (string.IsNullOrWhiteSpace(p.Name))
@@ -136,6 +159,72 @@ public sealed class ProfileRepository
             OcrEngine = OcrEngine,
             CaptureIntervalMs = CaptureIntervalMs,
             CreatedAt = DateTime.TryParse(CreatedAt, out var dt) ? dt : DateTime.UtcNow,
+        };
+    }
+
+    // T53 JSON surface. Stable, versioned by hand so the preset docs can refer to the schema.
+    // Format deliberately mirrors the DB column names minus Id/CreatedAt (assigned at insert).
+    private sealed class ProfileDto
+    {
+        public int SchemaVersion { get; set; } = 1;
+        public string Name { get; set; } = "";
+        public string? ExecutableName { get; set; }
+        public string SourceLang { get; set; } = "auto";
+        public string TargetLang { get; set; } = "id";
+        public string OcrEngine { get; set; } = "Tesseract";
+        public int CaptureIntervalMs { get; set; } = 800;
+        public List<RegionDto> Regions { get; set; } = new();
+
+        public static ProfileDto FromModel(GameProfile p) => new()
+        {
+            Name = p.Name,
+            ExecutableName = p.ExecutableName,
+            SourceLang = p.SourceLang,
+            TargetLang = p.TargetLang,
+            OcrEngine = p.OcrEngine.ToString(),
+            CaptureIntervalMs = p.CaptureIntervalMs,
+            Regions = p.Regions.Select(RegionDto.FromModel).ToList(),
+        };
+
+        public GameProfile ToModel() => new()
+        {
+            Name = Name,
+            ExecutableName = ExecutableName,
+            SourceLang = SourceLang,
+            TargetLang = TargetLang,
+            OcrEngine = Enum.TryParse<OcrEngineKind>(OcrEngine, out var k) ? k : OcrEngineKind.Tesseract,
+            CaptureIntervalMs = CaptureIntervalMs,
+            Regions = Regions.Select(r => r.ToModel()).ToList(),
+        };
+    }
+
+    private sealed class RegionDto
+    {
+        public string RegionName { get; set; } = "";
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public int MonitorIndex { get; set; }
+        public bool IsActiveDefault { get; set; }
+        public int SortOrder { get; set; }
+
+        public static RegionDto FromModel(CaptureRegion r) => new()
+        {
+            RegionName = r.RegionName,
+            X = r.X, Y = r.Y, Width = r.Width, Height = r.Height,
+            MonitorIndex = r.MonitorIndex,
+            IsActiveDefault = r.IsActiveDefault,
+            SortOrder = r.SortOrder,
+        };
+
+        public CaptureRegion ToModel() => new()
+        {
+            RegionName = RegionName,
+            X = X, Y = Y, Width = Width, Height = Height,
+            MonitorIndex = MonitorIndex,
+            IsActiveDefault = IsActiveDefault,
+            SortOrder = SortOrder,
         };
     }
 }

@@ -215,7 +215,8 @@ Metode: jalankan game 60 detik tanpa overlay (baseline FPS), 60 detik dengan ove
 **Depends on**: — (independent verification).
 
 #### T53. Game-specific profiles & preset docs
-**Status**: ⬜ pending.
+**Status**: ✅ done (fixtures + import tests + docs landed). Coordinates flagged as unverified —
+per-machine validation required before treating preset as final.
 **Deskripsi**: PRD 13 list game AAA dengan subtitle. Bikin profile + dokumen preset untuk 3 game:
 - **The Last of Us Part I** — region tipikal: 1920x1080 di y=950, width=920, height=80. Font: game default, capture interval 800ms.
 - **God of War (2018)** — region tipikal: 1920x1080 di y=920, width=960, height=100. Bahasa: English (default game), target: id.

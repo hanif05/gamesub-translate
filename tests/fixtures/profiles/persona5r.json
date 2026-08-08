@@ -1,0 +1,21 @@
+{
+  "SchemaVersion": 1,
+  "Name": "Persona 5 Royal",
+  "ExecutableName": "P5R.exe",
+  "SourceLang": "en",
+  "TargetLang": "id",
+  "OcrEngine": "Tesseract",
+  "CaptureIntervalMs": 800,
+  "Regions": [
+    {
+      "RegionName": "Dialog Box",
+      "X": 410,
+      "Y": 1000,
+      "Width": 1100,
+      "Height": 80,
+      "MonitorIndex": 0,
+      "IsActiveDefault": true,
+      "SortOrder": 0
+    }
+  ]
+}
