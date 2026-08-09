@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Profile" Height="540" Width="560" MinHeight="420" MinWidth="460"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Icon="pack://application:,,,/App.ico"
         Style="{StaticResource Window.Base}">
     <Grid>
         <Grid.RowDefinitions>

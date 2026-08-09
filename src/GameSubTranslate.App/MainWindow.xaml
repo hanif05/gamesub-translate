@@ -5,6 +5,7 @@
         xmlns:app="clr-namespace:GameSubTranslate.App"
         Title="GameSubTranslate" Height="500" Width="700" MinHeight="400" MinWidth="560"
         WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/App.ico"
         Style="{StaticResource Window.Base}">
     <Window.Resources>
         <!-- F59: profile item template — avatar circle + name + exe + active strip + region badge. -->

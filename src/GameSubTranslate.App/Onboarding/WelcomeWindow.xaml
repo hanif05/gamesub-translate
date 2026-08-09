@@ -5,6 +5,7 @@
         Width="560" MinHeight="420" SizeToContent="Height"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
         ShowInTaskbar="True"
+        Icon="pack://application:,,,/App.ico"
         Style="{StaticResource Window.Base}">
     <Window.Resources>
         <!-- F65: feature card style for the Step 3 tour tiles. -->

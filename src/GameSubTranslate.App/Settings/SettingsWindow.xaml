@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Settings" Width="600" MinHeight="480" SizeToContent="Height"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
+        Icon="pack://application:,,,/App.ico"
         Style="{StaticResource Window.Base}">
     <Window.Resources>
         <!-- F60: card-style content wrapper — tab content sits in a Surface card with breathing room. -->

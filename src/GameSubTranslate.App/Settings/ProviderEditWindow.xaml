@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Provider" Height="360" Width="480" MinHeight="300" MinWidth="400"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Icon="pack://application:,,,/App.ico"
         Style="{StaticResource Window.Base}">
     <Grid>
         <Grid.RowDefinitions>
