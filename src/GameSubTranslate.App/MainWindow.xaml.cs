@@ -3,10 +3,12 @@ using System.Windows.Controls;
 using GameSubTranslate.App.Profiles;
 using GameSubTranslate.Cache;
 using GameSubTranslate.Config;
+using GameSubTranslate.Logging;
 using GameSubTranslate.Ocr;
 using GameSubTranslate.Pipeline;
 using GameSubTranslate.Profiles;
 using GameSubTranslate.Storage;
+using GameSubTranslate.Translation;
 
 namespace GameSubTranslate.App;
 
@@ -18,12 +20,14 @@ public partial class MainWindow : Window
     private readonly SettingsStore _settingsStore;
     private readonly AppSettings _settings;
     private readonly Overlay.OverlayWindow? _overlay;
+    private readonly FileLogger? _logger;
     private TranslatePipeline? _pipeline;
     private bool _updating; // guard against event feedback during Refresh
 
-    public MainWindow() : this(new Database(), null, null) { }
+    public MainWindow() : this(new Database(), null, null, null) { }
 
-    public MainWindow(Database db, Window? owner, Overlay.OverlayWindow? overlay = null)
+    public MainWindow(Database db, Window? owner, Overlay.OverlayWindow? overlay = null,
+        GameSubTranslate.Logging.FileLogger? logger = null)
     {
         InitializeComponent();
         _db = db;
@@ -31,6 +35,7 @@ public partial class MainWindow : Window
         _repo = new ProfileRepository(db);
         _settingsStore = new SettingsStore();
         _settings = _settingsStore.Load();
+        _logger = logger;
         _service = new ProfileService(_repo, _settingsStore, _settings);
         _overlay = overlay;
         if (owner is not null) Owner = owner;
@@ -138,6 +143,34 @@ public partial class MainWindow : Window
         else
         {
             Refresh(); // profile list stale (created/deleted elsewhere) → reload + try select
+        }
+    }
+
+    /// <summary>T49: tray-facing accessors. App reads these to build the tray tooltip + region submenu.</summary>
+    public string? ActiveProfileName() => _service.ActiveProfile?.Name;
+
+    public IReadOnlyList<CaptureRegion> ActiveProfileRegions()
+        => _service.ActiveProfile?.Regions ?? (IReadOnlyList<CaptureRegion>)Array.Empty<CaptureRegion>();
+
+    public int? ActiveRegionId() => _service.ActiveRegionId;
+
+    public void SetActiveRegion(int regionId) => _service.SetActiveRegion(regionId);
+
+    /// <summary>T49: forward provider failover signals to the App so it can repaint the tray icon.</summary>
+    public event Action<string>? TranslatorFailoverSignal;
+
+    /// <summary>T49: current translation client (null when no pipeline yet). Used by App to
+    /// subscribe to FailoverChanged without poking at internals.</summary>
+    public TranslationClient? CurrentClient
+    {
+        get
+        {
+            // Pipeline keeps the translator private; reflect once. Avoids adding a public Client
+            // getter to Core just for tray wiring.
+            if (_pipeline is null) return null;
+            var f = typeof(TranslatePipeline).GetField("_translator",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            return f?.GetValue(_pipeline) as TranslationClient;
         }
     }
 
@@ -261,7 +294,8 @@ public partial class MainWindow : Window
             }),
             onToken: token => Dispatcher.Invoke(() => _overlay?.AppendToken(token)),
             onStreamStart: () => Dispatcher.Invoke(() => _overlay?.BeginStream()),
-            onStreamEnd: () => Dispatcher.Invoke(() => _overlay?.EndStream()));
+            onStreamEnd: () => Dispatcher.Invoke(() => _overlay?.EndStream()),
+            logger: _logger);
 
         // T26 scenario 10: surface pipeline/translation errors on the overlay too, so a dead API
         // key is visible over the game instead of the overlay silently staying empty. T39: the
@@ -283,6 +317,7 @@ public partial class MainWindow : Window
         _pipeline.TranslatorFailover += name => Dispatcher.Invoke(() =>
         {
             _overlay?.ShowText(name == "primary" ? "✅ back on primary" : $"⚠ degraded: {name}");
+            TranslatorFailoverSignal?.Invoke(name); // T49: repaint tray icon to yellow.
         });
         return _pipeline;
     }
@@ -350,5 +385,15 @@ public partial class MainWindow : Window
         // New API key/model → the running TranslationClient holds the old key. Drop the pipeline so
         // the next Start builds one with the fresh config (T26: settings change = rebuild).
         ResetPipeline("Settings changed — click Start to resume with the new config.");
+    }
+
+    /// <summary>T51: target-language switch from tray submenu / cycle hotkey. The pipeline carries
+    /// the target language in the TranslationClient, so it has to be rebuilt before the next capture.
+    /// The active profile's per-profile TargetLang is left alone — global setting wins (matches
+    /// existing per-profile-vs-global resolution at EnsurePipeline time).</summary>
+    public void SwitchTargetLang(string code)
+    {
+        _settings.TargetLang = code;
+        ResetPipeline($"Target lang switched to {code}. Click Start to resume.");
     }
 }

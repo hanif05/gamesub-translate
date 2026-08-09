@@ -1,0 +1,75 @@
+<Window x:Class="GameSubTranslate.App.Onboarding.WelcomeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Welcome to GameSubTranslate"
+        Width="520" SizeToContent="Height"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
+        ShowInTaskbar="True">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="StepTitle" Grid.Row="0" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,6"/>
+        <TextBlock x:Name="StepHint" Grid.Row="1" Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,14"/>
+
+        <!-- ===== Step 1: API setup ===== -->
+        <StackPanel x:Name="Step1" Grid.Row="3" Visibility="Collapsed">
+            <TextBlock Text="Base URL" FontWeight="SemiBold"/>
+            <TextBox x:Name="BaseUrlBox" Margin="0,4,0,12"/>
+            <TextBlock Text="Model" FontWeight="SemiBold"/>
+            <TextBox x:Name="ModelBox" Margin="0,4,0,12"/>
+            <TextBlock Text="API Key" FontWeight="SemiBold"/>
+            <PasswordBox x:Name="ApiKeyBox" Margin="0,4,0,12"/>
+            <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11">
+                <Run Text="You can also configure these later in Settings. "/>
+                <Hyperlink x:Name="OpenAiDocLink" NavigateUri="https://platform.openai.com/api-keys">OpenAI</Hyperlink>
+                <Run Text=" · "/>
+                <Hyperlink x:Name="OpenRouterDocLink" NavigateUri="https://openrouter.ai/keys">OpenRouter</Hyperlink>
+            </TextBlock>
+        </StackPanel>
+
+        <!-- ===== Step 2: target language ===== -->
+        <StackPanel x:Name="Step2" Grid.Row="3" Visibility="Collapsed">
+            <TextBlock Text="Target language" FontWeight="SemiBold"/>
+            <ComboBox x:Name="TargetLangBox" Margin="0,4,0,12" IsEditable="True">
+                <ComboBoxItem Content="id"/>
+                <ComboBoxItem Content="en"/>
+                <ComboBoxItem Content="ja"/>
+                <ComboBoxItem Content="ko"/>
+                <ComboBoxItem Content="zh"/>
+                <ComboBoxItem Content="fr"/>
+                <ComboBoxItem Content="de"/>
+                <ComboBoxItem Content="es"/>
+            </ComboBox>
+            <TextBlock Text="Source language is auto-detected by default — you can change it in Settings."
+                       Foreground="Gray" TextWrapping="Wrap" FontSize="11"/>
+        </StackPanel>
+
+        <!-- ===== Step 3: quick tour ===== -->
+        <StackPanel x:Name="Step3" Grid.Row="3" Visibility="Collapsed">
+            <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                <Run FontWeight="SemiBold" Text="Auto-load profile. "/>
+                <Run Text="When a game you have a profile for comes to the foreground, GameSubTranslate switches to it automatically."/>
+            </TextBlock>
+            <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                <Run FontWeight="SemiBold" Text="Hotkey. "/>
+                <Run Text="Ctrl+Alt+T toggles the overlay on/off. Pause via Ctrl+Alt+P. Press Ctrl+Alt+Space for a one-shot capture."/>
+            </TextBlock>
+            <TextBlock TextWrapping="Wrap" Margin="0,0,0,10">
+                <Run FontWeight="SemiBold" Text="Tray icon. "/>
+                <Run Text="Right-click for Show/Hide, Pause, Settings. Closing the main window keeps the app running in the tray."/>
+            </TextBlock>
+        </StackPanel>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button x:Name="SkipBtn" Content="Skip" Width="80" Margin="0,0,6,0" Click="Skip_Click"/>
+            <Button x:Name="BackBtn" Content="Back" Width="80" Margin="0,0,6,0" Click="Back_Click"/>
+            <Button x:Name="NextBtn" Content="Next" Width="80" IsDefault="True" Click="Next_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

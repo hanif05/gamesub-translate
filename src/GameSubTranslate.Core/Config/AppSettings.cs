@@ -48,6 +48,8 @@ public sealed class AppSettings
     public string HotkeyPauseCapture { get; set; } = "Ctrl+Alt+P";
     public string HotkeyOpenSettings { get; set; } = "Ctrl+Alt+S";
     public string HotkeyManualCapture { get; set; } = "Ctrl+Alt+Space";
+    /// <summary>T51: cycles TargetLang through id→en→ja→ko→zh→fr→de→es.</summary>
+    public string HotkeyCycleTargetLang { get; set; } = "Ctrl+Alt+L";
 
     // Last-active state (T9) so the active region survives restarts.
     public int? ActiveProfileId { get; set; }
@@ -56,6 +58,10 @@ public sealed class AppSettings
     /// <summary>T40: fallback providers tried in order after the primary fails 3x consecutive
     /// (Network/Provider only — Auth/BadRequest/RateLimit never failover).</summary>
     public List<ProviderConfig> Providers { get; set; } = new();
+
+    /// <summary>T45: false until the first-run welcome wizard is finished. Gates the wizard so
+    /// returning users skip it.</summary>
+    public bool SetupCompleted { get; set; }
 
     public bool TranslationEnabled =>
         !string.IsNullOrWhiteSpace(ApiKey) &&

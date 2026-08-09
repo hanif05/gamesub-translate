@@ -25,6 +25,8 @@ public partial class OverlayWindow : Window
         _settings = settings;
         DataContext = ViewModel;
         ApplyStyle();
+        // T47: start invisible so the first ShowOverlay can fade in instead of popping.
+        Opacity = 0;
     }
 
     private void ApplyStyle()
@@ -46,11 +48,15 @@ public partial class OverlayWindow : Window
 
     private void ApplyStyle(AppSettings settings)
     {
-        Opacity = settings.OverlayOpacity;
+        // Opacity is owned by the fade system (T47) — don't stomp it on settings reload.
         TextCard.Background = BrushFor(settings.OverlayBgColor);
         Subtitle.Foreground = BrushFor(settings.OverlayTextColor);
         Subtitle.FontFamily = new System.Windows.Media.FontFamily(settings.OverlayFontFamily);
         Subtitle.FontSize = settings.OverlayFontSize;
+        // T46: cap to 3 lines using a MaxHeight proportional to font size. ~1.5× line-height
+        // is WPF's default, ×3 lines, plus card padding (8 top + 8 bottom). 16 is the
+        // border padding total. Anything beyond gets CharacterEllipsis (set in XAML).
+        Subtitle.MaxHeight = settings.OverlayFontSize * 1.5 * 3 + 16;
     }
 
     private static System.Windows.Media.Brush BrushFor(string hex)
@@ -85,7 +91,10 @@ public partial class OverlayWindow : Window
                 Top = SystemParameters.WorkArea.Bottom - Height - 40;
             }
         }
-        Show();
+        if (!IsVisible) Show();
+        // T47: fade in unless we're already at target opacity (caller is just toggling).
+        if (Opacity < _settings.OverlayOpacity - 0.001)
+            FadeTo(_settings.OverlayOpacity, 200);
     }
 
     /// <summary>
@@ -122,7 +131,13 @@ public partial class OverlayWindow : Window
         MouseUp += up;
     }
 
-    public void HideOverlay() => Hide();
+    public void HideOverlay()
+    {
+        if (!IsVisible) return;
+        // T47: fade out before hide so the dismissal isn't a snap. If a fade is already in
+        // flight (e.g. cross-fade out-half), re-targeting to 0 is fine — TickFade handles it.
+        FadeTo(0, 300, hideOnDone: true);
+    }
 
     // ---- Direct drag (hold Shift + move cursor over the overlay). No click needed: the overlay is
     // click-through (WS_EX_TRANSPARENT) so WPF mouse events never fire — we poll instead.
@@ -179,8 +194,24 @@ public partial class OverlayWindow : Window
 
     public void ShowText(string text)
     {
+        // T47: detect "new text while visible" → cross-fade (fade out, swap, fade in) so
+        // the swap isn't a jarring text change. First show or empty → just fade in.
+        var prev = ViewModel.Text;
         ViewModel.ShowText(text);
-        TextCard.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+        if (string.IsNullOrEmpty(text))
+        {
+            TextCard.Visibility = Visibility.Collapsed;
+            return;
+        }
+        TextCard.Visibility = Visibility.Visible;
+        if (!IsVisible || Opacity <= 0.001)
+        {
+            FadeTo(_settings.OverlayOpacity, 200);
+        }
+        else if (prev != text)
+        {
+            CrossFade(150);
+        }
     }
 
     /// <summary>T36: start a streaming pass — clears the overlay text so tokens start fresh.</summary>
@@ -188,6 +219,8 @@ public partial class OverlayWindow : Window
     {
         ViewModel.BeginStream();
         TextCard.Visibility = Visibility.Visible;
+        // T47: streaming kicks off with a fresh fade in.
+        FadeTo(_settings.OverlayOpacity, 200);
     }
 
     /// <summary>T36: append a streaming token to the overlay (already shown after BeginStream).</summary>
@@ -200,6 +233,59 @@ public partial class OverlayWindow : Window
         if (string.IsNullOrEmpty(ViewModel.Text)) TextCard.Visibility = Visibility.Collapsed;
     }
 
+    // --- T47: opacity animation. DispatcherTimer ticks ~60fps and linearly interpolates
+    // Opacity from _startOpacity to _targetOpacity. Each FadeTo resets the start point from
+    // the current value (cheap re-targeting). The timer runs on the dispatcher, so it
+    // doesn't block the translation pipeline thread.
+    private readonly DispatcherTimer _fadeTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    private double _targetOpacity;
+    private double _startOpacity;
+    private DateTime _fadeStart;
+    private int _fadeDuration;
+    private bool _onFadeOutDoneHide;
+
+    private void FadeTo(double target, int durationMs, bool hideOnDone = false)
+    {
+        _targetOpacity = target;
+        _startOpacity = Opacity;
+        _fadeStart = DateTime.UtcNow;
+        _fadeDuration = Math.Max(1, durationMs);
+        _onFadeOutDoneHide = hideOnDone && target <= 0.001;
+        if (!_fadeTimer.IsEnabled) _fadeTimer.Start();
+    }
+
+    /// <summary>Quick out→in swap so consecutive subtitles don't pop.</summary>
+    private void CrossFade(int totalMs)
+    {
+        var half = Math.Max(40, totalMs / 2);
+        _pendingFadeInMs = half;
+        FadeTo(0, half);
+    }
+
+    private int _pendingFadeInMs;
+
+    private void TickFade(object? sender, EventArgs e)
+    {
+        var elapsed = (DateTime.UtcNow - _fadeStart).TotalMilliseconds;
+        if (elapsed >= _fadeDuration)
+        {
+            Opacity = _targetOpacity;
+            if (_pendingFadeInMs > 0 && _targetOpacity <= 0.001)
+            {
+                // Cross-fade: out-half finished, kick the in-half.
+                var next = _pendingFadeInMs;
+                _pendingFadeInMs = 0;
+                FadeTo(_settings.OverlayOpacity, next);
+                return;
+            }
+            _fadeTimer.Stop();
+            if (_onFadeOutDoneHide) Hide();
+            return;
+        }
+        var t = elapsed / _fadeDuration;
+        Opacity = _startOpacity + (_targetOpacity - _startOpacity) * t;
+    }
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
@@ -209,12 +295,15 @@ public partial class OverlayWindow : Window
 
         _moveTimer.Tick += (_, _) => TickMove();
         _moveTimer.Start();
+
+        _fadeTimer.Tick += TickFade;
     }
 
     /// <summary>Click-through is a window style; restore it if we ever suspended it.</summary>
     protected override void OnClosed(EventArgs e)
     {
         _moveTimer.Stop();
+        _fadeTimer.Stop();
         base.OnClosed(e);
     }
 }

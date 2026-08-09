@@ -13,7 +13,7 @@
         <TabControl x:Name="Tabs" Grid.Row="0" Grid.RowSpan="2" Margin="0,0,0,12" MinHeight="420">
 
             <!-- ============ API & Model ============ -->
-            <TabItem Header="API &amp; Model">
+            <TabItem Header="⚙ API &amp; Model">
                 <StackPanel Margin="10">
                     <TextBlock Text="Base URL" FontWeight="SemiBold"/>
                     <TextBox x:Name="BaseUrlBox" Margin="0,4,0,12"/>
@@ -32,6 +32,8 @@
                     <TextBlock Text="Fallback providers" FontWeight="SemiBold" Margin="0,14,0,4"/>
                     <DockPanel Margin="0,0,0,6">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Content="▲" Width="32" Margin="6,0,2,0" Click="ProviderUp_Click" ToolTip="Move up (higher priority)"/>
+                            <Button Content="▼" Width="32" Margin="0,0,2,0" Click="ProviderDown_Click" ToolTip="Move down (lower priority)"/>
                             <Button Content="Add" Width="52" Margin="6,0,4,0" Click="ProviderAdd_Click"/>
                             <Button Content="Edit" Width="52" Margin="0,0,4,0" Click="ProviderEdit_Click"/>
                             <Button Content="Remove" Width="62" Click="ProviderRemove_Click"/>
@@ -45,7 +47,7 @@
             </TabItem>
 
             <!-- ============ Language ============ -->
-            <TabItem Header="Language">
+            <TabItem Header="🌐 Language">
                 <StackPanel Margin="10">
                     <TextBlock Text="Source language" FontWeight="SemiBold"/>
                     <ComboBox x:Name="SourceLangBox" Margin="0,4,0,12" IsEditable="True">
@@ -73,10 +75,15 @@
             </TabItem>
 
             <!-- ============ Capture ============ -->
-            <TabItem Header="Capture">
+            <TabItem Header="📷 Capture">
                 <StackPanel Margin="10">
                     <TextBlock Text="Capture interval (ms)" FontWeight="SemiBold"/>
-                    <TextBox x:Name="IntervalBox" Margin="0,4,0,12" Width="120" HorizontalAlignment="Left"/>
+                    <DockPanel Margin="0,4,0,12" LastChildFill="True">
+                        <TextBlock x:Name="IntervalWarn" DockPanel.Dock="Right" Foreground="#D04040"
+                                   VerticalAlignment="Center" Margin="8,0,0,0" Text=""/>
+                        <TextBox x:Name="IntervalBox" Width="120" HorizontalAlignment="Left"
+                                 TextChanged="IntervalBox_Changed"/>
+                    </DockPanel>
                     <TextBlock Text="OCR engine" FontWeight="SemiBold"/>
                     <ComboBox x:Name="OcrEngineBox" Margin="0,4,0,0" Width="160" HorizontalAlignment="Left">
                         <ComboBoxItem Content="Tesseract" Tag="Tesseract"/>
@@ -86,7 +93,7 @@
             </TabItem>
 
             <!-- ============ Overlay ============ -->
-            <TabItem Header="Overlay">
+            <TabItem Header="🎨 Overlay">
                 <Grid>
                 <StackPanel Margin="10">
                     <DockPanel Margin="0,0,0,12">
@@ -95,7 +102,7 @@
                         <TextBlock Text="Overlay position" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </DockPanel>
                     <TextBlock Text="Font family" FontWeight="SemiBold"/>
-                    <TextBox x:Name="FontFamilyBox" Margin="0,4,0,12"/>
+                    <TextBox x:Name="FontFamilyBox" Margin="0,4,0,12" TextChanged="OverlayStyle_Changed"/>
                     <TextBlock Text="Font size" FontWeight="SemiBold"/>
                     <StackPanel Orientation="Horizontal" Margin="0,4,0,12">
                         <TextBlock Text="20" Foreground="Gray" VerticalAlignment="Center"/>
@@ -107,18 +114,30 @@
                     </StackPanel>
                     <TextBlock Text="Text color" FontWeight="SemiBold"/>
                     <DockPanel Margin="0,4,0,12">
-                        <TextBox x:Name="TextColorBox" Width="110" Margin="0,0,8,0"/>
+                        <TextBox x:Name="TextColorBox" Width="110" Margin="0,0,8,0" TextChanged="OverlayStyle_Changed"/>
                         <Button x:Name="TextColorBtn" Content="…" Width="32" Click="TextColor_Click"/>
                         <TextBlock Text="Background color" FontWeight="SemiBold" VerticalAlignment="Center" Margin="16,0,0,0"/>
-                        <TextBox x:Name="BgColorBox" Width="110" Margin="8,0" VerticalAlignment="Center"/>
+                        <TextBox x:Name="BgColorBox" Width="110" Margin="8,0" VerticalAlignment="Center" TextChanged="OverlayStyle_Changed"/>
                         <Button x:Name="BgColorBtn" Content="…" Width="32" Click="BgColor_Click"/>
                     </DockPanel>
                     <TextBlock Text="Opacity" FontWeight="SemiBold"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,12">
                         <Slider x:Name="OpacitySlider" Minimum="0" Maximum="1" Width="200"
                                 VerticalAlignment="Center"/>
                         <TextBlock x:Name="OpacityText" Text="1.00" Foreground="Gray" VerticalAlignment="Center" Margin="8,0,0,0"/>
                     </StackPanel>
+
+                    <!-- T48: live preview of the overlay as it will look in-game. Updates on any
+                         font/size/color/opacity change without requiring Save. -->
+                    <TextBlock Text="Preview" FontWeight="SemiBold" Margin="0,4,0,4"/>
+                    <Border x:Name="PreviewCard" CornerRadius="8" Padding="16,8" Background="#CC000000"
+                            HorizontalAlignment="Stretch" MinHeight="60">
+                        <Border.Effect>
+                            <DropShadowEffect Color="Black" Opacity="0.7" BlurRadius="6" ShadowDepth="2"/>
+                        </Border.Effect>
+                        <TextBlock x:Name="PreviewText" Text="Sample subtitle text" TextAlignment="Center"
+                                   TextWrapping="Wrap" Foreground="White" FontFamily="Segoe UI" FontSize="20"/>
+                    </Border>
                 </StackPanel>
 
                 <Popup x:Name="ColorPopup" StaysOpen="False" AllowsTransparency="True">
@@ -130,7 +149,7 @@
             </TabItem>
 
             <!-- ============ Hotkeys ============ -->
-            <TabItem Header="Hotkeys">
+            <TabItem Header="⌨ Hotkeys">
                 <StackPanel Margin="10">
                     <DockPanel Margin="0,0,0,8">
                         <Button x:Name="ToggleHotkeyBtn" Content="Change" DockPanel.Dock="Right" Width="80" Click="ToggleHotkey_Change"/>
@@ -147,10 +166,15 @@
                         <TextBlock Text="Open settings" VerticalAlignment="Center"/>
                         <TextBlock x:Name="SettingsHotkeyText" Foreground="Gray" Margin="12,0,0,0" VerticalAlignment="Center"/>
                     </DockPanel>
-                    <DockPanel>
+                    <DockPanel Margin="0,0,0,8">
                         <Button x:Name="ManualHotkeyBtn" Content="Change" DockPanel.Dock="Right" Width="80" Click="ManualHotkey_Change"/>
                         <TextBlock Text="Manual capture" VerticalAlignment="Center"/>
                         <TextBlock x:Name="ManualHotkeyText" Foreground="Gray" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                    </DockPanel>
+                    <DockPanel>
+                        <Button x:Name="CycleLangHotkeyBtn" Content="Change" DockPanel.Dock="Right" Width="80" Click="CycleLangHotkey_Change"/>
+                        <TextBlock Text="Cycle target language" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="CycleLangHotkeyText" Foreground="Gray" Margin="12,0,0,0" VerticalAlignment="Center"/>
                     </DockPanel>
                     <TextBlock x:Name="HotkeyHint" Text="" Foreground="#FFC080" Margin="0,12,0,0"
                                Visibility="Collapsed" TextWrapping="Wrap"/>
@@ -158,7 +182,7 @@
             </TabItem>
 
             <!-- ============ Profiles ============ -->
-            <TabItem Header="Profiles">
+            <TabItem Header="🎮 Profiles">
                 <StackPanel Margin="10">
                     <DockPanel Margin="0,0,0,8">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -173,9 +197,10 @@
             </TabItem>
 
             <!-- ============ About / Logs ============ -->
-            <TabItem Header="About">
+            <TabItem Header="ℹ About">
                 <StackPanel Margin="10">
                     <TextBlock Text="GameSubTranslate" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="AboutVersion" Text="" Foreground="Gray" Margin="0,0,0,12"/>
                     <TextBlock Text="Auto-translate subtitle game via screen capture + OCR + AI. Personal tool."
                                Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,12"/>
                     <DockPanel Margin="0,0,0,6">
@@ -183,7 +208,25 @@
                         <TextBlock Text="Logs" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </DockPanel>
                     <TextBlock Text="Diagnostics written to %APPDATA%\GameSubTranslate\logs (rotated at 5 MB)."
-                               Foreground="Gray" FontSize="11" TextWrapping="Wrap"/>
+                               Foreground="Gray" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                    <!-- T52: surface the FSE limitation here so users running into "no overlay in fullscreen" find the answer without opening docs. -->
+                    <Border Background="#22FF8800" BorderBrush="#FFA06030" BorderThickness="1"
+                            CornerRadius="4" Padding="8" Margin="0,0,0,12">
+                        <TextBlock Foreground="#FFE0B070" FontSize="11" TextWrapping="Wrap">
+                            <Run FontWeight="SemiBold">Known limitation:</Run>
+                            <Run Text=" Fullscreen Exclusive mode can hide the overlay (DirectX exclusive bypasses DWM, so WPF Topmost windows don't composite). Use Borderless Windowed — capture and hotkeys work in both modes."/>
+                        </TextBlock>
+                    </Border>
+                    <!-- T52: surface the FSE limitation here so users running into "no overlay in fullscreen" find the answer without opening docs. -->
+                    <Border Background="#22FF8800" BorderBrush="#FFA06030" BorderThickness="1"
+                            CornerRadius="4" Padding="8" Margin="0,0,0,12">
+                        <TextBlock Foreground="#FFE0B070" FontSize="11" TextWrapping="Wrap">
+                            <Run FontWeight="SemiBold">⚠ Known limitation:</Run>
+                            <Run Text=" Fullscreen Exclusive mode can hide the overlay (DirectX exclusive bypasses DWM, so WPF Topmost windows don't composite). Use Borderless Windowed — capture and hotkeys work in both modes."/>
+                        </TextBlock>
+                    </Border>
+                    <Button Content="Reset to Defaults" Width="160" HorizontalAlignment="Left"
+                            Click="ResetDefaults_Click" ToolTip="Reset every setting except API key"/>
                 </StackPanel>
             </TabItem>
         </TabControl>

@@ -25,4 +25,11 @@
     <ProjectReference Include="..\..\src\GameSubTranslate.Core\GameSubTranslate.Core.csproj" />
   </ItemGroup>
 
+  <!-- T53: copy preset JSON to bin so the test discovers fixtures via AppContext.BaseDirectory. -->
+  <ItemGroup>
+    <None Include="..\..\fixtures\profiles\*.json" Link="fixtures\profiles\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -63,7 +63,7 @@ public sealed class TranslationCacheRepository
     /// (default 500) ordered by CreatedAt DESC — keeps the scan cheap as the cache grows.
     /// </summary>
     public (string translated, double similarity)? GetFuzzy(
-        string sourceText, string targetLang, double similarityThreshold = 0.85, int maxScanRows = 500)
+        string sourceText, string targetLang, double similarityThreshold = 0.80, int maxScanRows = 500)
     {
         if (string.IsNullOrEmpty(sourceText)) return null;
 

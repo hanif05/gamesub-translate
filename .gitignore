@@ -5,3 +5,8 @@ obj/
 .vs/
 .env
 **/TestResults/
+
+# Fase 4: installer output
+installer/Output/
+installer/publish-output/
+installer/*.exe

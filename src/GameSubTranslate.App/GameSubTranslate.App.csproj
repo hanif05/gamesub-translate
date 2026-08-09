@@ -11,6 +11,22 @@
     <UseWindowsForms>true</UseWindowsForms>
     <!-- Transitive from Core's Win2D → WindowsAppSDK; needed for `dotnet build` without VS. -->
     <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
+
+    <!-- T44: release metadata. Version is read by the installer via src/.../version.txt too,
+         so the two stay in sync: bump both at once. -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Product>GameSubTranslate</Product>
+    <Company>hanif05</Company>
+    <Copyright>Personal use only</Copyright>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <!-- T44: Release config gets the optimization knobs. Debug stays default so dev loop is fast. -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <Optimize>true</Optimize>
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +35,23 @@
 
   <ItemGroup>
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
+  </ItemGroup>
+
+  <!-- T44: ship version.txt so About tab / installer both read the same value. -->
+  <ItemGroup>
+    <None Include="version.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- T43/T44: ship the OCR language data so the installer copies it into {app}\assets\tessdata.
+       Tesseract loads traineddata at runtime from this path; without it the app starts but every
+       OCR call fails. Path is relative to the .csproj (../../assets). -->
+  <ItemGroup>
+    <None Include="..\..\assets\**\*">
+      <Link>assets\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,21 @@
+{
+  "SchemaVersion": 1,
+  "Name": "God of War (2018)",
+  "ExecutableName": "GoW.exe",
+  "SourceLang": "en",
+  "TargetLang": "id",
+  "OcrEngine": "Tesseract",
+  "CaptureIntervalMs": 800,
+  "Regions": [
+    {
+      "RegionName": "Dialog",
+      "X": 480,
+      "Y": 920,
+      "Width": 960,
+      "Height": 100,
+      "MonitorIndex": 0,
+      "IsActiveDefault": true,
+      "SortOrder": 0
+    }
+  ]
+}

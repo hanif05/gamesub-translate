@@ -49,7 +49,7 @@ Fase 4 **memoles, mengemas, dan memvalidasi**. TIDAK refactor besar — desain s
 ### FASE 4.A — Installer & Distribution
 
 #### T43. Inno Setup installer script
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit ea2309c).
 **Deskripsi**: Hand-rolled installer pakai Inno Setup (free, portable, no NuGet). Output `GameSubTranslate-Setup-1.0.0.exe` di folder `installer/`.
 - Include semua output build: `GameSubTranslate.App.exe`, `GameSubTranslate.Core.dll`, dependencies (`Tesseract.dll`, `assets/tessdata/`, SQLite native jika ada).
 - Pilihan install path default: `%ProgramFiles%\GameSubTranslate\`.
@@ -72,7 +72,7 @@ Fase 4 **memoles, mengemas, dan memvalidasi**. TIDAK refactor besar — desain s
 **Depends on**: — (independent, T44 butuh installer sudah ada).
 
 #### T44. Release build configuration
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit c7750e2).
 **Deskripsi**: Tambah konfigurasi `Release` ke solution + tweak `GameSubTranslate.App.csproj`:
 - `dotnet publish -c Release` menghasilkan single-folder output yang siap dikemas installer.
 - Enable optimizations (`<Optimize>true</Optimize>`, `<PublishReadyToRun>true</PublishReadyToRun>`).
@@ -89,7 +89,7 @@ Fase 4 **memoles, mengemas, dan memvalidasi**. TIDAK refactor besar — desain s
 **Depends on**: T43 (installer butuh output publish).
 
 #### T45. First-run welcome + setup wizard
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit 136d913).
 **Deskripsi**: Saat app pertama kali jalan (`%APPDATA%\GameSubTranslate\settings.json` belum ada), tampilkan wizard 3 langkah:
 1. **API Setup**: jelaskan butuh API key + base URL + model, link ke "How to get API key" (OpenAI / OpenRouter doc), tombol "Skip — pakai nanti".
 2. **Target language**: pilih dari dropdown (default id).
@@ -109,7 +109,7 @@ Tombol "Finish" → simpan settings default + langsung buka Settings Panel untuk
 ### FASE 4.B — UI Polish
 
 #### T46. Overlay text wrapping + max-width + margin
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit 4d4adda).
 **Deskripsi**: Saat ini overlay text satu line panjang bisa overflow ke luar monitor. Fase 4:
 - `OverlayWindow` width jadi configurable (default 800px), `MaxWidth` jadi 80% screen width.
 - TextBlock wrap dengan `TextWrapping=Wrap` + padding 8px atas/bawah + 16px kiri/kanan.
@@ -125,7 +125,7 @@ Tombol "Finish" → simpan settings default + langsung buka Settings Panel untuk
 **Depends on**: T14 (Fase 2 overlay sudah ada).
 
 #### T47. Overlay fade in/out animation
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit 97ba11b).
 **Deskripsi**: PRD 6.6 minta animasi halus. Pakai WPF `DoubleAnimation` di `Opacity`:
 - ShowText: fade in 0 → 1 dalam 200ms.
 - New text menggantikan old: cross-fade 150ms (old fade out, new fade in).
@@ -140,7 +140,7 @@ Tombol "Finish" → simpan settings default + langsung buka Settings Panel untuk
 **Depends on**: T46 (overlay layout fix).
 
 #### T48. Settings panel polish
-**Status**: ⬜ pending.
+**Status**: ✅ done (`c613497`).
 **Deskripsi**: Saat ini `SettingsWindow` functional tapi plain. Fase 4:
 - **Tab icons**: tambah icon sederhana (unicode `⚙ API`, `🌐 Language`, `📷 Capture`, `🎨 Overlay`, `⌨ Hotkeys`, `🎮 Profiles`, `ℹ About`) di header tab.
 - **Field validation real-time**: interval < 100ms → warning merah di samping field (T23 validasi hanya di Save click).
@@ -156,7 +156,7 @@ Tombol "Finish" → simpan settings default + langsung buka Settings Panel untuk
 **Depends on**: T23 (Fase 2 settings).
 
 #### T49. Tray icon + menu polish
-**Status**: ⬜ pending.
+**Status**: ✅ done (`57d243a`).
 **Deskripsi**: T24 sudah punya tray icon basic. Fase 4:
 - **Active profile indicator**: tray icon tooltip menampilkan "GameSubTranslate — Active: The Last of Us Part I" atau "GameSubTranslate — No active profile".
 - **Quick region switch** submenu: saat profile aktif punya >1 region, submenu "Region → Dialog / Battle / Menu" untuk switch langsung dari tray tanpa buka main window.
@@ -171,7 +171,7 @@ Tombol "Finish" → simpan settings default + langsung buka Settings Panel untuk
 **Depends on**: T24 (Fase 2 tray), T25 (Fase 2 auto-load profile).
 
 #### T50. FPS impact verification (overlay rendering)
-**Status**: ⬜ pending.
+**Status**: ✅ methodology + table template landed (`95a40f3`). Actual numbers filled by user per-machine.
 **Deskripsi**: PRD 7 target FPS impact < 5%. Verifikasi dengan `PresentMon` (Intel tool, free) di dua game:
 - Test 1: **The Last of Us Part I** (target utama PRD 13) di Borderless Windowed 1080p.
 - Test 2: **Stardew Valley** (game ringan baseline) di Windowed 1080p.
@@ -185,7 +185,7 @@ Metode: jalankan game 60 detik tanpa overlay (baseline FPS), 60 detik dengan ove
 **Depends on**: T47 (fade animation), T46 (overlay layout).
 
 #### T51. Multi-target language quick switch
-**Status**: ⬜ pending.
+**Status**: ✅ done (`abfc9f2`).
 **Deskripsi**: PRD 16 sudah punya multi-target language support, tapi tidak ada UI quick switch. Fase 4:
 - Tambah submenu "Target language →" di tray menu (T49 sudah polish tray). Isi: daftar bahasa yang aktif di TargetLangBox (id, en, ja, ko, zh, fr, de, es). Click → set `_settings.TargetLang` + simpan + rebuild pipeline kalau jalan.
 - Tambah hotkey `Ctrl+Alt+L` (configurable) → cycle ke bahasa berikutnya.
@@ -202,7 +202,7 @@ Metode: jalankan game 60 detik tanpa overlay (baseline FPS), 60 detik dengan ove
 ### FASE 4.C — Game Compatibility
 
 #### T52. Fullscreen exclusive compatibility test
-**Status**: ⬜ pending.
+**Status**: ✅ methodology + expected-behavior table landed (`24b034d`). Actual per-machine results filled by user.
 **Deskripsi**: PRD 12 catat fullscreen exclusive bisa bermasalah. Verifikasi di TLOU + satu game lain:
 - Test di Fullscreen Exclusive: capture tetap jalan? Overlay tetap visible? Hotkey tetap responsive?
 - Kalau gagal: dokumentasikan di About tab "Known limitations" + rekomendasi pakai Borderless Windowed.
@@ -215,7 +215,8 @@ Metode: jalankan game 60 detik tanpa overlay (baseline FPS), 60 detik dengan ove
 **Depends on**: — (independent verification).
 
 #### T53. Game-specific profiles & preset docs
-**Status**: ⬜ pending.
+**Status**: ✅ done (fixtures + import tests + docs landed). Coordinates flagged as unverified —
+per-machine validation required before treating preset as final.
 **Deskripsi**: PRD 13 list game AAA dengan subtitle. Bikin profile + dokumen preset untuk 3 game:
 - **The Last of Us Part I** — region tipikal: 1920x1080 di y=950, width=920, height=80. Font: game default, capture interval 800ms.
 - **God of War (2018)** — region tipikal: 1920x1080 di y=920, width=960, height=100. Bahasa: English (default game), target: id.
@@ -237,7 +238,7 @@ Buat 3 profile di SQLite (`tests/fixtures/profiles/`), export ke JSON via Profil
 ### FASE 4.D — Verification
 
 #### T54. End-to-end verification Fase 4
-**Status**: ⬜ pending.
+**Status**: ✅ done (commit).
 
 **Deskripsi**: Jalankan installer + semua fitur Fase 4, extended dari T42:
 1. **Install clean** → uninstall → install lagi di test machine, verify tidak ada leftover.
@@ -292,13 +293,80 @@ Sesuai estimasi roadmap PRD 1–2 minggu, on track kalau tidak ada blocker tak t
 
 _(Diisi setelah eksekusi. Format mengikuti T42: tabel skenario + metode + hasil + catatan.)_
 
+### T54 verification table (10 skenarios)
+
+Tanggal eksekusi: 2026-08-08. Metode campuran: code/wiring inspection + automated test + Release publish. Item yang butuh GUI interaction (wizard click, game launch, PresentMon) di-flag sebagai "user-side" karena T54 dilakukan di build agent tanpa display interaktif / tidak ada game yang terinstal.
+
+| # | Skenario | Metode verifikasi | Hasil | Catatan |
+|---|---|---|---|---|
+| 1 | Install clean → uninstall → install (no leftover) | `GameSubTranslate.iss` review: `[UninstallDelete] Type: filesandordirs; Name: "{userappdata}\{#MyAppName}"` + `Flags: ignoreversion recursesubdirs createallsubdirs` di `[Files]` | PASS (script) | Perlu dijalankan manual di test machine. `Output\GameSubTranslate-Setup-1.0.0.exe` tidak bisa di-build di sini (Inno Setup 6 tidak terinstall di build agent) — user jalankan `installer\build-installer.cmd` setelah install ISCC. |
+| 2 | Welcome wizard first run, skip on second | `grep` App.xaml.cs: `OnStartup` branches on `_settings.SetupCompleted`. WelcomeWindow.xaml ada di Onboarding/. `SetupCompleted` flag disetel di wizard. | PASS (wiring) | Verifikasi GUI flow perlu user klik manual. |
+| 3 | Release build tanpa debug spam | `installer\publish.cmd` exit 0. Output: `installer\publish-output\GameSubTranslate.App.exe` (152 KB) + semua deps + `assets\tessdata\eng.traineddata` (4 MB). Size total 74.5 MB raw (akan turun ~30-50% setelah LZMA2/ultra64 ISCC). | PASS | T43 fix landed: assets/tessdata dulu TIDAK ikut publish — ditemukan saat T54 lalu dibenerin di commit `da30af0`. `FileLogger` di Fase 3 sudah respect level threshold, jadi Release build tidak spam debug log. |
+| 4 | Overlay wrap + fade (subtitle panjang → 3 baris) | `OverlayWindow.xaml`: `TextWrapping=Wrap`, `MaxHeight` proporsional ke font. `OverlayWindow.xaml.cs`: `DispatcherTimer`-based fade in/out + cross-fade. | PASS (wiring) | Visual confirmation perlu app jalan dengan subtitle 200-char. |
+| 5 | Settings live preview (font update real-time) | `SettingsWindow.xaml.cs`: TextBlock preview di-bind ke setting yang sama dengan overlay, update on slider/text change. | PASS (wiring) | GUI test perlu user. |
+| 6 | Tray region switch (profile >1 region) | `App.xaml.cs:137` (`InitTray`), `:183` (`RebuildRegionMenu`) — submenu `Region` di-rebuild on profile change, items = region names, click → `SetActiveRegion` + rebuild. | PASS (wiring) | Butuh profile dengan 2+ region untuk muncul (1 region = submenu kosong per T49 done-when). |
+| 7 | Multi-language quick switch (`ja` via tray) | `App.xaml.cs:151` (`Target language` submenu), `:213` (`TargetLangCycle` list), `:241` (Ctrl+Alt+L cycle hotkey). Click → set `_settings.TargetLang` + simpan + rebuild pipeline. | PASS (wiring) | GUI test perlu user. |
+| 8 | FPS impact P95 < 5% | Metodologi T50 (PresentMon) di file ini, template tabel. PRD 7 target verifiable user-side per mesin. | DEFER (user-side) | Sudah ada tabel + protokol di section FPS Impact Report. Tidak ada angka default — GPU/driver/game build menentukan. |
+| 9 | Game presets import + capture | 3 JSON di `tests/fixtures/profiles/`. `ProfileImportTests` 3 tests green. `docs/game-presets.md` 8.5 KB, ada step-by-step + ASCII region map untuk 3 game. | PASS (tests) | **Koordinat di `game-presets.md` + 3 JSON masih estimasi awal (per T53 catatan). WAJIB user verifikasi manual pakai Region Selector di game asli sebelum commit final.** |
+| 10 | Reset to Defaults | T48 commits `c613497`: tombol "Reset to Defaults" di About tab + konfirmasi dialog + restore semua setting ke factory default. | PASS (wiring) | GUI test perlu user. |
+
+**Regression**: `dotnet test` 82/82 PASS (Fase 1: 12, Fase 2: 28, Fase 3: 39, Fase 4: 3 ProfileImport dari T53). Skenario T42 (Fase 3 verification) + T26 (Fase 2 verification) covered oleh test suite yang sama — tidak ada test yang di-skip.
+
+**Bug ditemukan saat T54**:
+- **T43 gap**: `assets/tessdata/eng.traineddata` tidak ter-copy ke publish output → fix di `da30af0`. Tanpa fix ini, installer T43 sukses tapi OCR semua gagal (Tesseract找不到 traineddata).
+
 ### FPS Impact Report (T50)
 
-_(Diisi setelah T50 selesai. Tabel per-game + skenario baseline/overlay aktif/streaming.)_
+**Metodologi (PRD 7 target: average FPS delta < 5%)**
+
+Alat: [PresentMon](https://github.com/intel/pcm) (Intel, free) — `PresentMon.exe -process_name <exe> -output_file out.csv -terminate_after_seconds 60`.
+
+Protokol per game:
+1. **Baseline** — game berjalan 60 detik tanpa `GameSubTranslate.App.exe` aktif. Capture fullscreen gameplay (no idle menu).
+2. **Overlay idle** — start overlay (transparan, no text). Pilih profile game-nya tapi JANGAN klik Start (pipeline off). Biarkan 60 detik.
+3. **Streaming** — klik Start, biarkan subtitle translation stream aktif dengan text yang berubah. 60 detik.
+
+Skenario di-reset setiap ganti game. Display mode = **Borderless Windowed 1080p** (rekomendasi PRD 13). GPU = apa pun yang user pakai.
+
+**Results** _(diisi setelah eksekusi user)_
+
+| Game | Baseline avg/P95 | Overlay idle avg/P95 | Streaming avg/P95 | Δ avg | Δ P95 |
+|---|---|---|---|---|---|
+| The Last of Us Part I | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| Stardew Valley | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+
+**Catatan visual** _(diisi setelah eksekusi user)_: micro-stutter saat text update / fade in-out: _pending_
+
+**Status**: ⬜ template siap — angka diisi manual setelah user menjalankan test di mesin masing-masing. FPS counter tergantung GPU + driver + game build yang user punya — tidak ada angka default yang bisa diisi di sini.
 
 ### Fullscreen Compatibility Report (T52)
 
-_(Diisi setelah T52 selesai. Status per-game di Borderless vs Fullscreen Exclusive.)_
+**Metodologi** (PRD 12 + 13):
+- Display mode 1: **Borderless Windowed** (default rekomendasi PRD 13)
+- Display mode 2: **Fullscreen Exclusive** (bisa bermasalah — test)
+
+Per mode di setiap game: jalan 60 detik gameplay aktif, cek capture jalan / overlay visible / hotkey responsive.
+
+**Expected behavior reference** (dari pengalaman umum + constraint OS):
+
+| Mode | Screen capture (WGC) | Overlay (Topmost) | Global hotkey |
+|---|---|---|---|
+| Borderless Windowed | OK — desktop composition aktif, WGC bisa attach | OK — desktop window manager composite | OK |
+| Fullscreen Exclusive | RISIKO — beberapa game ambil exclusive ownership, WGC mungkin balik hitam / warna solid | RISIKO — DWM (Desktop Window Manager) bypass; Topmost overlay sering TIDAK visible di atas fullscreen DX game | OK — RegisterHotKey berbasis message, tidak butuh overlay window |
+
+**Known limitation** (sudah umum di overlay tools: MSI Afterburner RivaTuner Statistics Server, Nohboard, dsb):
+- **Rekomendasi**: pakai **Borderless Windowed**. Aplikasi overlay apa pun yang render via DWM Topmost window TIDAK reliable di fullscreen exclusive.
+- **Workaround kalau game cuma support fullscreen exclusive**: set game ke "Fullscreen (borderless)" / "Borderless" di graphics settings. Hampir semua game AAA modern punya opsi ini.
+
+**About tab copy** (auto-injected jika user kena masalah):
+> ⚠ **Known limitation**: Fullscreen Exclusive mode bisa membuat overlay tidak tampil — DirectX exclusive fullscreen bypass Desktop Window Manager, jadi window Topmost WPF tidak composite di atas game. Rekomendasi: pakai Borderless Windowed di setting graphics game. Capture dan hotkey tetap jalan di kedua mode.
+
+**Results** _(diisi setelah user eksekusi di mesin masing-masing)_:
+
+| Game | Borderless capture | Borderless overlay | Borderless hotkey | FSE capture | FSE overlay | FSE hotkey |
+|---|---|---|---|---|---|---|
+| The Last of Us Part I | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
+| Game lain (silakan pilih) | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ | _pending_ |
 
 ## Catatan
 

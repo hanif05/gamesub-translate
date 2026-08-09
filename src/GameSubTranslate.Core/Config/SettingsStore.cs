@@ -51,9 +51,11 @@ public sealed class SettingsStore
                 HotkeyPauseCapture = dto.HotkeyPauseCapture ?? "Ctrl+Alt+P",
                 HotkeyOpenSettings = dto.HotkeyOpenSettings ?? "Ctrl+Alt+S",
                 HotkeyManualCapture = dto.HotkeyManualCapture ?? "Ctrl+Alt+Space",
+                HotkeyCycleTargetLang = dto.HotkeyCycleTargetLang ?? "Ctrl+Alt+L",
                 ActiveProfileId = dto.ActiveProfileId,
                 ActiveRegionId = dto.ActiveRegionId,
                 Providers = dto.Providers ?? new(),
+                SetupCompleted = dto.SetupCompleted,
             };
         }
         catch
@@ -88,9 +90,11 @@ public sealed class SettingsStore
             HotkeyPauseCapture = s.HotkeyPauseCapture,
             HotkeyOpenSettings = s.HotkeyOpenSettings,
             HotkeyManualCapture = s.HotkeyManualCapture,
+            HotkeyCycleTargetLang = s.HotkeyCycleTargetLang,
             ActiveProfileId = s.ActiveProfileId,
             ActiveRegionId = s.ActiveRegionId,
             Providers = s.Providers,
+            SetupCompleted = s.SetupCompleted,
         };
 
         File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, JsonOpts));
@@ -138,8 +142,10 @@ public sealed class SettingsStore
         public string? HotkeyPauseCapture { get; set; }
         public string? HotkeyOpenSettings { get; set; }
         public string? HotkeyManualCapture { get; set; }
+        public string? HotkeyCycleTargetLang { get; set; }
         public int? ActiveProfileId { get; set; }
         public int? ActiveRegionId { get; set; }
         public List<ProviderConfig>? Providers { get; set; }
+        public bool SetupCompleted { get; set; }
     }
 }

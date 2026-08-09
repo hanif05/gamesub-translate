@@ -1,0 +1,21 @@
+{
+  "SchemaVersion": 1,
+  "Name": "The Last of Us Part I",
+  "ExecutableName": "tlou-i.exe",
+  "SourceLang": "en",
+  "TargetLang": "id",
+  "OcrEngine": "Tesseract",
+  "CaptureIntervalMs": 800,
+  "Regions": [
+    {
+      "RegionName": "Dialog",
+      "X": 500,
+      "Y": 950,
+      "Width": 920,
+      "Height": 80,
+      "MonitorIndex": 0,
+      "IsActiveDefault": true,
+      "SortOrder": 0
+    }
+  ]
+}
