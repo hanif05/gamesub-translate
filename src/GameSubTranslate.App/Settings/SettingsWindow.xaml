@@ -1,9 +1,36 @@
 <Window x:Class="GameSubTranslate.App.Settings.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Settings" Width="560" MinHeight="460" SizeToContent="Height"
+        Title="Settings" Width="600" MinHeight="480" SizeToContent="Height"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
         Style="{StaticResource Window.Base}">
+    <Window.Resources>
+        <!-- F60: card-style content wrapper — tab content sits in a Surface card with breathing room. -->
+        <Style x:Key="Tab.Card" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="{StaticResource Brush.Bg.Surface}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Brush.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+        <!-- F61: helper caption style (small muted text under fields). -->
+        <Style x:Key="Text.Helper" TargetType="{x:Type TextBlock}"
+               BasedOn="{StaticResource Text.Caption}">
+            <Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <!-- F63: hotkey capture banner — full-width warn strip. -->
+        <Style x:Key="Banner.Warn" TargetType="{x:Type Border}">
+            <Setter Property="Background" Value="#33E0A040"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Brush.Warn}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+    </Window.Resources>
+
     <Grid Margin="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -11,9 +38,9 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TabControl x:Name="Tabs" Grid.Row="0" Grid.RowSpan="2" Margin="0,0,0,12" MinHeight="420">
+        <TabControl x:Name="Tabs" Grid.Row="0" Grid.RowSpan="2" MinHeight="440">
 
-            <!-- F57: Segoe Fluent Icons codepoints for monochrome tab headers. -->
+            <!-- ============ API &amp; Model (T61) ============ -->
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
@@ -21,36 +48,68 @@
                         <Run Text=" API &amp; Model"/>
                     </StackPanel>
                 </TabItem.Header>
-                <StackPanel Margin="10">
-                    <TextBlock Text="Base URL" FontWeight="SemiBold"/>
-                    <TextBox x:Name="BaseUrlBox" Margin="0,4,0,12"/>
-                    <TextBlock Text="Model" FontWeight="SemiBold"/>
-                    <TextBox x:Name="ModelBox" Margin="0,4,0,12"/>
-                    <TextBlock Text="API Key" FontWeight="SemiBold"/>
-                    <PasswordBox x:Name="ApiKeyBox" Margin="0,4,0,12"/>
-                    <DockPanel>
-                        <Button x:Name="TestBtn" Content="Test Connection" DockPanel.Dock="Right"
-                                Width="130" Margin="8,0,0,0" Click="TestConnection_Click"/>
-                        <TextBlock x:Name="TestResult" VerticalAlignment="Center" TextWrapping="Wrap" Text=""/>
-                    </DockPanel>
+                <Border Style="{StaticResource Tab.Card}">
+                    <StackPanel>
+                        <TextBlock Text="Base URL" FontWeight="SemiBold"/>
+                        <TextBox x:Name="BaseUrlBox" Margin="0,4,0,0"/>
+                        <TextBlock Style="{StaticResource Text.Helper}"
+                                   Text="OpenAI-compatible endpoint, e.g. https://api.openai.com/v1 or https://openrouter.ai/api/v1"/>
 
-                    <!-- T40: fallback providers. Primary (above) is always tried first; if it fails
-                         3x with Network/Provider errors, the client hops here in list order. -->
-                    <TextBlock Text="Fallback providers" FontWeight="SemiBold" Margin="0,14,0,4"/>
-                    <DockPanel Margin="0,0,0,6">
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                            <Button Content="▲" Width="32" Margin="6,0,2,0" Click="ProviderUp_Click" ToolTip="Move up (higher priority)"/>
-                            <Button Content="▼" Width="32" Margin="0,0,2,0" Click="ProviderDown_Click" ToolTip="Move down (lower priority)"/>
-                            <Button Content="Add" Width="52" Margin="6,0,4,0" Click="ProviderAdd_Click"/>
-                            <Button Content="Edit" Width="52" Margin="0,0,4,0" Click="ProviderEdit_Click"/>
-                            <Button Content="Remove" Width="62" Click="ProviderRemove_Click"/>
-                        </StackPanel>
-                        <ListBox x:Name="ProviderList" MinHeight="70" DisplayMemberPath="Name"
-                                 SelectionChanged="ProviderList_SelectionChanged"/>
-                    </DockPanel>
-                    <TextBlock Text="Fallback is tried when the primary fails 3× (Network/Provider). A bad API key never failovers."
-                               Foreground="Gray" TextWrapping="Wrap" FontSize="11"/>
-                </StackPanel>
+                        <TextBlock Text="Model" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                        <TextBox x:Name="ModelBox" Margin="0,4,0,0"/>
+                        <TextBlock Style="{StaticResource Text.Helper}"
+                                   Text="e.g. gpt-4o-mini, anthropic/claude-3.5-sonnet, etc."/>
+
+                        <TextBlock Text="API Key" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <PasswordBox x:Name="ApiKeyBox" Grid.Column="0"/>
+                            <Button x:Name="ToggleApiKeyVisibilityBtn" Grid.Column="1" Margin="6,0,0,0"
+                                    Width="36" Click="ToggleApiKeyVisibility_Click"
+                                    ToolTip="Show / hide API key">
+                                <Run FontFamily="Segoe Fluent Icons" x:Name="ApiKeyEyeIcon" Text="&#xE7B3;" FontSize="14"/>
+                            </Button>
+                        </Grid>
+                        <TextBlock x:Name="ApiKeyHelper" Style="{StaticResource Text.Helper}">
+                            <Hyperlink x:Name="OpenAiDocLink" NavigateUri="https://platform.openai.com/api-keys">Get one from platform.openai.com</Hyperlink>
+                            <Run Text=" · "/>
+                            <Hyperlink x:Name="OpenRouterDocLink" NavigateUri="https://openrouter.ai/keys">or openrouter.ai/keys</Hyperlink>
+                        </TextBlock>
+
+                        <DockPanel Margin="0,14,0,0">
+                            <TextBlock x:Name="TestResult" VerticalAlignment="Center" TextWrapping="Wrap" Text=""/>
+                            <Button x:Name="TestBtn" Content="Test Connection" DockPanel.Dock="Right"
+                                    Width="130" Margin="8,0,0,0" Style="{StaticResource Button.Primary}"
+                                    Click="TestConnection_Click"/>
+                        </DockPanel>
+
+                        <!-- T61: fallback providers. Primary (above) is always tried first; if it fails
+                             3x with Network/Provider errors, the client hops here in list order. -->
+                        <TextBlock Text="Fallback providers" FontWeight="SemiBold" Margin="0,18,0,4"/>
+                        <DockPanel Margin="0,0,0,6">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button x:Name="ProviderUpBtn" Width="32" Margin="6,0,2,0"
+                                        Click="ProviderUp_Click" ToolTip="Move up (higher priority)">
+                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE74A;" FontSize="12"/>
+                                </Button>
+                                <Button x:Name="ProviderDownBtn" Width="32" Margin="0,0,2,0"
+                                        Click="ProviderDown_Click" ToolTip="Move down (lower priority)">
+                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE74B;" FontSize="12"/>
+                                </Button>
+                                <Button Content="Add" Width="60" Margin="6,0,4,0" Click="ProviderAdd_Click"/>
+                                <Button Content="Edit" Width="60" Margin="0,0,4,0" Click="ProviderEdit_Click"/>
+                                <Button Content="Remove" Width="70" Click="ProviderRemove_Click"/>
+                            </StackPanel>
+                            <ListBox x:Name="ProviderList" MinHeight="80" DisplayMemberPath="Name"
+                                     SelectionChanged="ProviderList_SelectionChanged"/>
+                        </DockPanel>
+                        <TextBlock Style="{StaticResource Text.Helper}"
+                                   Text="Fallback is tried when the primary fails 3× (Network/Provider). A bad API key never failovers."/>
+                    </StackPanel>
+                </Border>
             </TabItem>
 
             <!-- ============ Language ============ -->
@@ -61,30 +120,37 @@
                         <Run Text=" Language"/>
                     </StackPanel>
                 </TabItem.Header>
-                <StackPanel Margin="10">
-                    <TextBlock Text="Source language" FontWeight="SemiBold"/>
-                    <ComboBox x:Name="SourceLangBox" Margin="0,4,0,12" IsEditable="True">
-                        <ComboBoxItem Content="auto"/>
-                        <ComboBoxItem Content="en"/>
-                        <ComboBoxItem Content="ja"/>
-                        <ComboBoxItem Content="ko"/>
-                        <ComboBoxItem Content="zh"/>
-                        <ComboBoxItem Content="fr"/>
-                        <ComboBoxItem Content="de"/>
-                        <ComboBoxItem Content="es"/>
-                    </ComboBox>
-                    <TextBlock Text="Target language" FontWeight="SemiBold"/>
-                    <ComboBox x:Name="TargetLangBox" Margin="0,4,0,0" IsEditable="True">
-                        <ComboBoxItem Content="id"/>
-                        <ComboBoxItem Content="en"/>
-                        <ComboBoxItem Content="ja"/>
-                        <ComboBoxItem Content="ko"/>
-                        <ComboBoxItem Content="zh"/>
-                        <ComboBoxItem Content="fr"/>
-                        <ComboBoxItem Content="de"/>
-                        <ComboBoxItem Content="es"/>
-                    </ComboBox>
-                </StackPanel>
+                <Border Style="{StaticResource Tab.Card}">
+                    <StackPanel>
+                        <TextBlock Text="Source language" FontWeight="SemiBold"/>
+                        <ComboBox x:Name="SourceLangBox" Margin="0,4,0,0" IsEditable="True">
+                            <ComboBoxItem Content="auto"/>
+                            <ComboBoxItem Content="en"/>
+                            <ComboBoxItem Content="ja"/>
+                            <ComboBoxItem Content="ko"/>
+                            <ComboBoxItem Content="zh"/>
+                            <ComboBoxItem Content="fr"/>
+                            <ComboBoxItem Content="de"/>
+                            <ComboBoxItem Content="es"/>
+                        </ComboBox>
+                        <TextBlock Style="{StaticResource Text.Helper}"
+                                   Text="Auto-detect by default. Override here if OCR misreads a script."/>
+
+                        <TextBlock Text="Target language" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                        <ComboBox x:Name="TargetLangBox" Margin="0,4,0,0" IsEditable="True">
+                            <ComboBoxItem Content="id"/>
+                            <ComboBoxItem Content="en"/>
+                            <ComboBoxItem Content="ja"/>
+                            <ComboBoxItem Content="ko"/>
+                            <ComboBoxItem Content="zh"/>
+                            <ComboBoxItem Content="fr"/>
+                            <ComboBoxItem Content="de"/>
+                            <ComboBoxItem Content="es"/>
+                        </ComboBox>
+                        <TextBlock Style="{StaticResource Text.Helper}"
+                                   Text="Output language for translated subtitles. Per-profile override lives in profile edit."/>
+                    </StackPanel>
+                </Border>
             </TabItem>
 
             <!-- ============ Capture ============ -->
@@ -95,23 +161,31 @@
                         <Run Text=" Capture"/>
                     </StackPanel>
                 </TabItem.Header>
-                <StackPanel Margin="10">
-                    <TextBlock Text="Capture interval (ms)" FontWeight="SemiBold"/>
-                    <DockPanel Margin="0,4,0,12" LastChildFill="True">
-                        <TextBlock x:Name="IntervalWarn" DockPanel.Dock="Right" Foreground="#D04040"
-                                   VerticalAlignment="Center" Margin="8,0,0,0" Text=""/>
-                        <TextBox x:Name="IntervalBox" Width="120" HorizontalAlignment="Left"
-                                 TextChanged="IntervalBox_Changed"/>
-                    </DockPanel>
-                    <TextBlock Text="OCR engine" FontWeight="SemiBold"/>
-                    <ComboBox x:Name="OcrEngineBox" Margin="0,4,0,0" Width="160" HorizontalAlignment="Left">
-                        <ComboBoxItem Content="Tesseract" Tag="Tesseract"/>
-                        <ComboBoxItem Content="Vision AI" Tag="VisionAi"/>
-                    </ComboBox>
-                </StackPanel>
+                <Border Style="{StaticResource Tab.Card}">
+                    <StackPanel>
+                        <TextBlock Text="Capture interval (ms)" FontWeight="SemiBold"/>
+                        <DockPanel Margin="0,4,0,0" LastChildFill="True">
+                            <TextBlock x:Name="IntervalWarn" DockPanel.Dock="Right"
+                                       Foreground="{StaticResource Brush.Error}" FontSize="11"
+                                       VerticalAlignment="Center" Margin="8,0,0,0" Text=""/>
+                            <TextBox x:Name="IntervalBox" Width="160" HorizontalAlignment="Left"
+                                     TextChanged="IntervalBox_Changed"/>
+                        </DockPanel>
+                        <TextBlock Style="{StaticResource Text.Helper}"
+                                   Text="Time between capture ticks. Lower = more responsive, higher = less CPU."/>
+
+                        <TextBlock Text="OCR engine" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                        <ComboBox x:Name="OcrEngineBox" Margin="0,4,0,0" Width="180" HorizontalAlignment="Left">
+                            <ComboBoxItem Content="Tesseract" Tag="Tesseract"/>
+                            <ComboBoxItem Content="Vision AI" Tag="VisionAi"/>
+                        </ComboBox>
+                        <TextBlock Style="{StaticResource Text.Helper}"
+                                   Text="Tesseract is local + fast. Vision AI handles exotic fonts but needs API quota."/>
+                    </StackPanel>
+                </Border>
             </TabItem>
 
-            <!-- ============ Overlay ============ -->
+            <!-- ============ Overlay (T62) ============ -->
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
@@ -119,61 +193,82 @@
                         <Run Text=" Overlay"/>
                     </StackPanel>
                 </TabItem.Header>
-                <Grid>
-                <StackPanel Margin="10">
-                    <DockPanel Margin="0,0,0,12">
-                        <Button x:Name="PickPosBtn" Content="Pick Position" DockPanel.Dock="Right"
-                                Width="110" Margin="8,0,0,0" Click="PickPosition_Click"/>
-                        <TextBlock Text="Overlay position" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    </DockPanel>
-                    <TextBlock Text="Font family" FontWeight="SemiBold"/>
-                    <TextBox x:Name="FontFamilyBox" Margin="0,4,0,12" TextChanged="OverlayStyle_Changed"/>
-                    <TextBlock Text="Font size" FontWeight="SemiBold"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,4,0,12">
-                        <TextBlock Text="20" Foreground="Gray" VerticalAlignment="Center"/>
-                        <Slider x:Name="FontSizeSlider" Minimum="10" Maximum="60" Width="200"
-                                Margin="8,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="FontSizeText" Text="60" Foreground="Gray" VerticalAlignment="Center" Width="24"/>
-                        <Button x:Name="FontSizePlus" Content="+" Width="28" Margin="4,0,0,0" Click="FontSizePlus_Click"/>
-                        <Button x:Name="FontSizeMinus" Content="-" Width="28" Margin="4,0,0,0" Click="FontSizeMinus_Click"/>
-                    </StackPanel>
-                    <TextBlock Text="Text color" FontWeight="SemiBold"/>
-                    <DockPanel Margin="0,4,0,12">
-                        <TextBox x:Name="TextColorBox" Width="110" Margin="0,0,8,0" TextChanged="OverlayStyle_Changed"/>
-                        <Button x:Name="TextColorBtn" Content="…" Width="32" Click="TextColor_Click"/>
-                        <TextBlock Text="Background color" FontWeight="SemiBold" VerticalAlignment="Center" Margin="16,0,0,0"/>
-                        <TextBox x:Name="BgColorBox" Width="110" Margin="8,0" VerticalAlignment="Center" TextChanged="OverlayStyle_Changed"/>
-                        <Button x:Name="BgColorBtn" Content="…" Width="32" Click="BgColor_Click"/>
-                    </DockPanel>
-                    <TextBlock Text="Opacity" FontWeight="SemiBold"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,4,0,12">
-                        <Slider x:Name="OpacitySlider" Minimum="0" Maximum="1" Width="200"
-                                VerticalAlignment="Center"/>
-                        <TextBlock x:Name="OpacityText" Text="1.00" Foreground="Gray" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                    </StackPanel>
+                <Border Style="{StaticResource Tab.Card}">
+                    <Grid>
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,12">
+                                <Button x:Name="PickPosBtn" Content="Pick Position" DockPanel.Dock="Right"
+                                        Width="120" Margin="8,0,0,0" Click="PickPosition_Click"/>
+                                <TextBlock Text="Overlay position" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </DockPanel>
 
-                    <!-- T48: live preview of the overlay as it will look in-game. Updates on any
-                         font/size/color/opacity change without requiring Save. -->
-                    <TextBlock Text="Preview" FontWeight="SemiBold" Margin="0,4,0,4"/>
-                    <Border x:Name="PreviewCard" CornerRadius="8" Padding="16,8" Background="#CC000000"
-                            HorizontalAlignment="Stretch" MinHeight="60">
-                        <Border.Effect>
-                            <DropShadowEffect Color="Black" Opacity="0.7" BlurRadius="6" ShadowDepth="2"/>
-                        </Border.Effect>
-                        <TextBlock x:Name="PreviewText" Text="Sample subtitle text" TextAlignment="Center"
-                                   TextWrapping="Wrap" Foreground="White" FontFamily="Segoe UI" FontSize="20"/>
-                    </Border>
-                </StackPanel>
+                            <TextBlock Text="Font family" FontWeight="SemiBold"/>
+                            <TextBox x:Name="FontFamilyBox" Margin="0,4,0,0" TextChanged="OverlayStyle_Changed"/>
 
-                <Popup x:Name="ColorPopup" StaysOpen="False" AllowsTransparency="True">
-                    <Border Background="#FF1E1E1E" BorderBrush="Gray" BorderThickness="1" CornerRadius="6" Padding="6">
-                        <WrapPanel x:Name="ColorPalette" Width="168"/>
-                    </Border>
-                </Popup>
-                </Grid>
+                            <TextBlock Text="Font size" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <TextBlock Text="20" Foreground="{StaticResource Brush.Text.Muted}" VerticalAlignment="Center"/>
+                                <Slider x:Name="FontSizeSlider" Style="{StaticResource Slider.Polished}"
+                                        Minimum="10" Maximum="60" Width="240" Margin="10,0"/>
+                                <TextBlock x:Name="FontSizeText" Text="60" Foreground="{StaticResource Brush.Text.Muted}"
+                                           VerticalAlignment="Center" Width="32"/>
+                                <Button x:Name="FontSizePlus" Width="28" Margin="6,0,0,0" Click="FontSizePlus_Click"
+                                        ToolTip="Increase">
+                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE710;" FontSize="12"/>
+                                </Button>
+                                <Button x:Name="FontSizeMinus" Width="28" Margin="4,0,0,0" Click="FontSizeMinus_Click"
+                                        ToolTip="Decrease">
+                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE738;" FontSize="12"/>
+                                </Button>
+                            </StackPanel>
+
+                            <TextBlock Text="Text color" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                            <DockPanel Margin="0,4,0,0">
+                                <TextBox x:Name="TextColorBox" Width="110" Margin="0,0,8,0" TextChanged="OverlayStyle_Changed"/>
+                                <Button x:Name="TextColorBtn" Width="36" Click="TextColor_Click" ToolTip="Pick color">
+                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE790;" FontSize="12"/>
+                                </Button>
+                                <TextBlock Text="Background" FontWeight="SemiBold" VerticalAlignment="Center" Margin="20,0,0,0"/>
+                                <TextBox x:Name="BgColorBox" Width="110" Margin="8,0" VerticalAlignment="Center" TextChanged="OverlayStyle_Changed"/>
+                                <Button x:Name="BgColorBtn" Width="36" Click="BgColor_Click" ToolTip="Pick color">
+                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE790;" FontSize="12"/>
+                                </Button>
+                            </DockPanel>
+
+                            <TextBlock Text="Opacity" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <Slider x:Name="OpacitySlider" Style="{StaticResource Slider.Polished}"
+                                        Minimum="0" Maximum="1" Width="240"/>
+                                <TextBlock x:Name="OpacityText" Text="1.00"
+                                           Foreground="{StaticResource Brush.Text.Muted}"
+                                           VerticalAlignment="Center" Margin="10,0,0,0" Width="42"/>
+                            </StackPanel>
+
+                            <TextBlock Text="Preview" FontWeight="SemiBold" Margin="0,16,0,4"/>
+                            <Border x:Name="PreviewCard" CornerRadius="8" Padding="16,12"
+                                    Background="#CC000000" HorizontalAlignment="Stretch" MinHeight="84">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black" Opacity="0.7" BlurRadius="8" ShadowDepth="2"/>
+                                </Border.Effect>
+                                <TextBlock x:Name="PreviewText"
+                                           Text="The quick brown fox jumps over the lazy dog."
+                                           TextAlignment="Center" TextWrapping="Wrap"
+                                           Foreground="White" FontFamily="Segoe UI" FontSize="20"/>
+                            </Border>
+                        </StackPanel>
+
+                        <Popup x:Name="ColorPopup" StaysOpen="False" AllowsTransparency="True">
+                            <Border Background="{StaticResource Brush.Bg.Surface}"
+                                    BorderBrush="{StaticResource Brush.Border}" BorderThickness="1"
+                                    CornerRadius="6" Padding="8">
+                                <WrapPanel x:Name="ColorPalette" Width="184"/>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </Border>
             </TabItem>
 
-            <!-- ============ Hotkeys ============ -->
+            <!-- ============ Hotkeys (T63) ============ -->
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
@@ -181,35 +276,70 @@
                         <Run Text=" Hotkeys"/>
                     </StackPanel>
                 </TabItem.Header>
-                <StackPanel Margin="10">
-                    <DockPanel Margin="0,0,0,8">
-                        <Button x:Name="ToggleHotkeyBtn" Content="Change" DockPanel.Dock="Right" Width="80" Click="ToggleHotkey_Change"/>
-                        <TextBlock Text="Toggle overlay" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="ToggleHotkeyText" Foreground="Gray" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                    </DockPanel>
-                    <DockPanel Margin="0,0,0,8">
-                        <Button x:Name="PauseHotkeyBtn" Content="Change" DockPanel.Dock="Right" Width="80" Click="PauseHotkey_Change"/>
-                        <TextBlock Text="Pause / resume capture" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="PauseHotkeyText" Foreground="Gray" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                    </DockPanel>
-                    <DockPanel Margin="0,0,0,8">
-                        <Button x:Name="SettingsHotkeyBtn" Content="Change" DockPanel.Dock="Right" Width="80" Click="SettingsHotkey_Change"/>
-                        <TextBlock Text="Open settings" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="SettingsHotkeyText" Foreground="Gray" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                    </DockPanel>
-                    <DockPanel Margin="0,0,0,8">
-                        <Button x:Name="ManualHotkeyBtn" Content="Change" DockPanel.Dock="Right" Width="80" Click="ManualHotkey_Change"/>
-                        <TextBlock Text="Manual capture" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="ManualHotkeyText" Foreground="Gray" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                    </DockPanel>
-                    <DockPanel>
-                        <Button x:Name="CycleLangHotkeyBtn" Content="Change" DockPanel.Dock="Right" Width="80" Click="CycleLangHotkey_Change"/>
-                        <TextBlock Text="Cycle target language" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="CycleLangHotkeyText" Foreground="Gray" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                    </DockPanel>
-                    <TextBlock x:Name="HotkeyHint" Text="" Foreground="#FFC080" Margin="0,12,0,0"
-                               Visibility="Collapsed" TextWrapping="Wrap"/>
-                </StackPanel>
+                <Border Style="{StaticResource Tab.Card}">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,8">
+                            <Button x:Name="ToggleHotkeyBtn" DockPanel.Dock="Right" Width="90" Click="ToggleHotkey_Change">
+                                <StackPanel Orientation="Horizontal">
+                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
+                                    <Run Text=" Change"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="Toggle overlay" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="ToggleHotkeyText" Margin="12,0,0,0"
+                                       Foreground="{StaticResource Brush.Text.Muted}" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <DockPanel Margin="0,0,0,8">
+                            <Button x:Name="PauseHotkeyBtn" DockPanel.Dock="Right" Width="90" Click="PauseHotkey_Change">
+                                <StackPanel Orientation="Horizontal">
+                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
+                                    <Run Text=" Change"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="Pause / resume capture" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="PauseHotkeyText" Margin="12,0,0,0"
+                                       Foreground="{StaticResource Brush.Text.Muted}" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <DockPanel Margin="0,0,0,8">
+                            <Button x:Name="SettingsHotkeyBtn" DockPanel.Dock="Right" Width="90" Click="SettingsHotkey_Change">
+                                <StackPanel Orientation="Horizontal">
+                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
+                                    <Run Text=" Change"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="Open settings" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="SettingsHotkeyText" Margin="12,0,0,0"
+                                       Foreground="{StaticResource Brush.Text.Muted}" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <DockPanel Margin="0,0,0,8">
+                            <Button x:Name="ManualHotkeyBtn" DockPanel.Dock="Right" Width="90" Click="ManualHotkey_Change">
+                                <StackPanel Orientation="Horizontal">
+                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
+                                    <Run Text=" Change"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="Manual capture" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="ManualHotkeyText" Margin="12,0,0,0"
+                                       Foreground="{StaticResource Brush.Text.Muted}" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <DockPanel>
+                            <Button x:Name="CycleLangHotkeyBtn" DockPanel.Dock="Right" Width="90" Click="CycleLangHotkey_Change">
+                                <StackPanel Orientation="Horizontal">
+                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
+                                    <Run Text=" Change"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="Cycle target language" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="CycleLangHotkeyText" Margin="12,0,0,0"
+                                       Foreground="{StaticResource Brush.Text.Muted}" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <!-- T63: full-width warn banner shown during capture. -->
+                        <Border x:Name="HotkeyHintBanner" Style="{StaticResource Banner.Warn}" Visibility="Collapsed">
+                            <TextBlock x:Name="HotkeyHint" Foreground="{StaticResource Brush.Warn}"
+                                       FontWeight="SemiBold"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
             </TabItem>
 
             <!-- ============ Profiles ============ -->
@@ -220,20 +350,22 @@
                         <Run Text=" Profiles"/>
                     </StackPanel>
                 </TabItem.Header>
-                <StackPanel Margin="10">
-                    <DockPanel Margin="0,0,0,8">
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                            <Button Content="New" Width="70" Margin="0,0,4,0" Click="ProfileNew_Click"/>
-                            <Button Content="Edit" Width="70" Margin="0,0,4,0" Click="ProfileEdit_Click"/>
-                            <Button Content="Delete" Width="70" Click="ProfileDelete_Click"/>
-                        </StackPanel>
-                        <TextBlock Text="Profiles" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    </DockPanel>
-                    <ListBox x:Name="ProfileList" DisplayMemberPath="Name" MinHeight="240"/>
-                </StackPanel>
+                <Border Style="{StaticResource Tab.Card}">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,8">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Content="New" Width="80" Margin="0,0,6,0" Click="ProfileNew_Click"/>
+                                <Button Content="Edit" Width="80" Margin="0,0,6,0" Click="ProfileEdit_Click"/>
+                                <Button Content="Delete" Width="80" Click="ProfileDelete_Click"/>
+                            </StackPanel>
+                            <TextBlock Text="Profiles" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <ListBox x:Name="ProfileList" DisplayMemberPath="Name" MinHeight="260"/>
+                    </StackPanel>
+                </Border>
             </TabItem>
 
-            <!-- ============ About / Logs ============ -->
+            <!-- ============ About (T64) ============ -->
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
@@ -241,42 +373,49 @@
                         <Run Text=" About"/>
                     </StackPanel>
                 </TabItem.Header>
-                <StackPanel Margin="10">
-                    <TextBlock Text="GameSubTranslate" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                    <TextBlock x:Name="AboutVersion" Text="" Foreground="Gray" Margin="0,0,0,12"/>
-                    <TextBlock Text="Auto-translate subtitle game via screen capture + OCR + AI. Personal tool."
-                               Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,12"/>
-                    <DockPanel Margin="0,0,0,6">
-                        <Button Content="Open Logs Folder" DockPanel.Dock="Right" Width="130" Margin="8,0,0,0" Click="OpenLogsFolder_Click"/>
-                        <TextBlock Text="Logs" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    </DockPanel>
-                    <TextBlock Text="Diagnostics written to %APPDATA%\GameSubTranslate\logs (rotated at 5 MB)."
-                               Foreground="Gray" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,12"/>
-                    <!-- T52: surface the FSE limitation here so users running into "no overlay in fullscreen" find the answer without opening docs. -->
-                    <Border Background="#22FF8800" BorderBrush="#FFA06030" BorderThickness="1"
-                            CornerRadius="4" Padding="8" Margin="0,0,0,12">
-                        <TextBlock Foreground="#FFE0B070" FontSize="11" TextWrapping="Wrap">
-                            <Run FontWeight="SemiBold">Known limitation:</Run>
-                            <Run Text=" Fullscreen Exclusive mode can hide the overlay (DirectX exclusive bypasses DWM, so WPF Topmost windows don't composite). Use Borderless Windowed — capture and hotkeys work in both modes."/>
-                        </TextBlock>
-                    </Border>
-                    <!-- T52: surface the FSE limitation here so users running into "no overlay in fullscreen" find the answer without opening docs. -->
-                    <Border Background="#22FF8800" BorderBrush="#FFA06030" BorderThickness="1"
-                            CornerRadius="4" Padding="8" Margin="0,0,0,12">
-                        <TextBlock Foreground="#FFE0B070" FontSize="11" TextWrapping="Wrap">
-                            <Run FontWeight="SemiBold">⚠ Known limitation:</Run>
-                            <Run Text=" Fullscreen Exclusive mode can hide the overlay (DirectX exclusive bypasses DWM, so WPF Topmost windows don't composite). Use Borderless Windowed — capture and hotkeys work in both modes."/>
-                        </TextBlock>
-                    </Border>
-                    <Button Content="Reset to Defaults" Width="160" HorizontalAlignment="Left"
-                            Click="ResetDefaults_Click" ToolTip="Reset every setting except API key"/>
-                </StackPanel>
+                <Border Style="{StaticResource Tab.Card}">
+                    <StackPanel>
+                        <TextBlock Text="GameSubTranslate" Style="{StaticResource Text.H1}" Margin="0,0,0,2"/>
+                        <TextBlock x:Name="AboutVersion" Style="{StaticResource Text.Caption}" Margin="0,0,0,12"/>
+
+                        <TextBlock Foreground="{StaticResource Brush.Text.Muted}" TextWrapping="Wrap"
+                                   MaxWidth="480" Margin="0,0,0,16"
+                                   Text="Real-time subtitle translation for PC games. Capture, OCR, translate via OpenAI-compatible API, overlay in-game."/>
+
+                        <DockPanel Margin="0,0,0,6">
+                            <Button Content="Open Logs Folder" DockPanel.Dock="Right" Width="160" Margin="8,0,0,0" Click="OpenLogsFolder_Click"/>
+                            <TextBlock Text="Logs" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <TextBlock Style="{StaticResource Text.Helper}"
+                                   Text="Diagnostics written to %APPDATA%\GameSubTranslate\logs (rotated at 5 MB)."/>
+
+                        <!-- T64: known limitation banner with icon. -->
+                        <Border Style="{StaticResource Banner.Warn}" Margin="0,14,0,12">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE946;" FontSize="14"
+                                           Foreground="{StaticResource Brush.Warn}" VerticalAlignment="Top" Margin="0,2,8,0"/>
+                                <TextBlock Foreground="{StaticResource Brush.Warn}" TextWrapping="Wrap" MaxWidth="440" FontSize="12">
+                                    <Run FontWeight="SemiBold" Text="Known limitation: "/>
+                                    <Run Text="Fullscreen Exclusive mode can hide the overlay (DirectX exclusive bypasses DWM, so WPF Topmost windows don't composite). Use Borderless Windowed — capture and hotkeys work in both modes."/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Style="{StaticResource Text.Caption}" Margin="0,0,0,12"
+                                   Text="Built with .NET 8 · WPF · Tesseract"/>
+
+                        <Button Content="Reset to Defaults" Width="180" HorizontalAlignment="Left"
+                                Style="{StaticResource Button.Destructive}"
+                                Click="ResetDefaults_Click" ToolTip="Reset every setting except API key"/>
+                    </StackPanel>
+                </Border>
             </TabItem>
         </TabControl>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="Save" Width="90" Margin="0,0,6,0" IsDefault="True" Click="Save_Click"/>
-            <Button Content="Cancel" Width="90" IsCancel="True" Click="Cancel_Click"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Content="Save" Width="100" Margin="0,0,6,0" IsDefault="True"
+                    Style="{StaticResource Button.Primary}" Click="Save_Click"/>
+            <Button Content="Cancel" Width="100" IsCancel="True" Click="Cancel_Click"/>
         </StackPanel>
     </Grid>
 </Window>

@@ -326,6 +326,37 @@
         <Setter Property="MinHeight" Value="20"/>
     </Style>
 
+    <!-- F62: Slider with thinner track (4px) + larger thumb (16px circle) for overlay tab. -->
+    <Style x:Key="Slider.Polished" TargetType="{x:Type Slider}">
+        <Setter Property="Background" Value="{StaticResource Brush.Bg.Surface2}"/>
+        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}"/>
+        <Setter Property="Height" Value="22"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Slider}">
+                    <Grid>
+                        <Border Height="4" VerticalAlignment="Center"
+                                Background="{StaticResource Brush.Bg.Surface2}" CornerRadius="2"/>
+                        <Track x:Name="PART_Track" Height="4">
+                            <Track.Thumb>
+                                <Thumb Width="16" Height="16" OverridesDefaultStyle="True">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="{x:Type Thumb}">
+                                            <Ellipse Width="16" Height="16"
+                                                     Fill="{StaticResource Brush.Accent}"
+                                                     Stroke="{StaticResource Brush.Border}"
+                                                     StrokeThickness="1"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- F57: Segoe Fluent Icons (built-in Win11) for monochrome icons in tab headers etc. -->
     <FontFamily x:Key="Font.Icon">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
