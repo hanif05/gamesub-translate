@@ -69,6 +69,10 @@ public partial class WelcomeWindow : Window
         Step3.Visibility = Visibility.Collapsed;
         BackBtn.IsEnabled = step > 1;
         NextBtn.Content = step == 3 ? "Finish" : "Next";
+        // F57: filled = current/done, outlined = upcoming. EA3A = filled circle, EA3B = outlined circle.
+        Dot1.Text = step >= 1 ? "" : "";
+        Dot2.Text = step >= 2 ? "" : "";
+        Dot3.Text = step >= 3 ? "" : "";
         switch (step)
         {
             case 1:

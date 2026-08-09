@@ -13,8 +13,14 @@
 
         <TabControl x:Name="Tabs" Grid.Row="0" Grid.RowSpan="2" Margin="0,0,0,12" MinHeight="420">
 
-            <!-- ============ API & Model ============ -->
-            <TabItem Header="⚙ API &amp; Model">
+            <!-- F57: Segoe Fluent Icons codepoints for monochrome tab headers. -->
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE713;" FontSize="14"/>
+                        <Run Text=" API &amp; Model"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <StackPanel Margin="10">
                     <TextBlock Text="Base URL" FontWeight="SemiBold"/>
                     <TextBox x:Name="BaseUrlBox" Margin="0,4,0,12"/>
@@ -48,7 +54,13 @@
             </TabItem>
 
             <!-- ============ Language ============ -->
-            <TabItem Header="🌐 Language">
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE909;" FontSize="14"/>
+                        <Run Text=" Language"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <StackPanel Margin="10">
                     <TextBlock Text="Source language" FontWeight="SemiBold"/>
                     <ComboBox x:Name="SourceLangBox" Margin="0,4,0,12" IsEditable="True">
@@ -76,7 +88,13 @@
             </TabItem>
 
             <!-- ============ Capture ============ -->
-            <TabItem Header="📷 Capture">
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE8B8;" FontSize="14"/>
+                        <Run Text=" Capture"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <StackPanel Margin="10">
                     <TextBlock Text="Capture interval (ms)" FontWeight="SemiBold"/>
                     <DockPanel Margin="0,4,0,12" LastChildFill="True">
@@ -94,7 +112,13 @@
             </TabItem>
 
             <!-- ============ Overlay ============ -->
-            <TabItem Header="🎨 Overlay">
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE8B1;" FontSize="14"/>
+                        <Run Text=" Overlay"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <Grid>
                 <StackPanel Margin="10">
                     <DockPanel Margin="0,0,0,12">
@@ -150,7 +174,13 @@
             </TabItem>
 
             <!-- ============ Hotkeys ============ -->
-            <TabItem Header="⌨ Hotkeys">
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE765;" FontSize="14"/>
+                        <Run Text=" Hotkeys"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <StackPanel Margin="10">
                     <DockPanel Margin="0,0,0,8">
                         <Button x:Name="ToggleHotkeyBtn" Content="Change" DockPanel.Dock="Right" Width="80" Click="ToggleHotkey_Change"/>
@@ -183,7 +213,13 @@
             </TabItem>
 
             <!-- ============ Profiles ============ -->
-            <TabItem Header="🎮 Profiles">
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE7FC;" FontSize="14"/>
+                        <Run Text=" Profiles"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <StackPanel Margin="10">
                     <DockPanel Margin="0,0,0,8">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -198,7 +234,13 @@
             </TabItem>
 
             <!-- ============ About / Logs ============ -->
-            <TabItem Header="ℹ About">
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE946;" FontSize="14"/>
+                        <Run Text=" About"/>
+                    </StackPanel>
+                </TabItem.Header>
                 <StackPanel Margin="10">
                     <TextBlock Text="GameSubTranslate" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4"/>
                     <TextBlock x:Name="AboutVersion" Text="" Foreground="Gray" Margin="0,0,0,12"/>

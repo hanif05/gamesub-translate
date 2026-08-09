@@ -326,4 +326,7 @@
         <Setter Property="MinHeight" Value="20"/>
     </Style>
 
+    <!-- F57: Segoe Fluent Icons (built-in Win11) for monochrome icons in tab headers etc. -->
+    <FontFamily x:Key="Font.Icon">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
 </ResourceDictionary>
