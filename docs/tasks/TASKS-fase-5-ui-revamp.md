@@ -141,7 +141,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.B — Main Window Revamp
 
 #### T58. Main window layout overhaul
-**Status**: ⬜.
+**Status**: ✅ done (commit pending).
 **Deskripsi**: `MainWindow.xaml` saat ini layout-nya raw DockPanel. Revamp jadi:
 - **Sidebar kiri** (240px): profile list dengan icon per profile + count badge.
 - **Main panel** (kanan): region combo, status pill, control button (Start/Pause/Stop) — pakai accent color untuk primary action.
@@ -164,7 +164,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Catatan**: T58 tidak butuh T57 (mono icon font) — tab icon di MainWindow opsional, pakai saat T57 selesai kalau sempat.
 
 #### T59. Profile list visual treatment
-**Status**: ⬜.
+**Status**: ✅ done (commit pending).
 **Deskripsi**: `ListBox` profile jadi custom item template:
 - Avatar/icon kiri (huruf pertama profile name dalam circle 32×32 dengan bg `Brush.Bg.Surface2`).
 - Nama profile (bold) + executable name (caption muted) di tengah.
