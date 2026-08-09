@@ -184,7 +184,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.C — Settings Window Revamp
 
 #### T60. Settings tab iconography + spacing
-**Status**: ✅ done (commit pending).
+**Status**: ✅ done (commit `070dff3`).
 **Deskripsi**: `SettingsWindow.xaml` saat ini 7 tab pakai emoji color unicode. Apply T57 (mono icon font) + tambah spacing breathing room:
 - Tab header: icon + label, gap 6px.
 - TabControl `Background=Transparent`, content area `Brush.Bg.Surface`, `CornerRadius=8` content area.
@@ -197,7 +197,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T57, T56.
 
 #### T61. API & Model tab redesign
-**Status**: ✅ done (commit pending).
+**Status**: ✅ done (commit `070dff3`).
 **Deskripsi**: Sub-form paling penting karena user wajib isi di sini. Revamp:
 - Label di-atas input dengan caption kecil "Get one from platform.openai.com" (link styled).
 - API key field: toggle visibility eye icon (G/F) di kanan.
@@ -211,7 +211,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T60.
 
 #### T62. Overlay tab — slider polish
-**Status**: ✅ done (commit pending).
+**Status**: ✅ done (commit `070dff3`).
 **Deskripsi**: Slider FontSize & Opacity pakai style baru:
 - Track lebih tipis (4px), thumb lebih besar (16px circle).
 - Value tooltip muncul saat drag (floating label).
@@ -224,7 +224,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T60, T55.
 
 #### T63. Hotkey capture polish
-**Status**: ✅ done (commit pending).
+**Status**: ✅ done (commit `070dff3`).
 **Deskripsi**: Hotkey "Change" button saat ini plain. Revamp:
 - Button pakai icon font "pencil/edit" codepoint + label.
 - Saat capture aktif: hint area jadi banner full-width dengan bg `Brush.Warn` semi-transparent + label "Press the new keys… ESC to cancel".
@@ -236,7 +236,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T60.
 
 #### T64. About tab polish
-**Status**: ✅ done (commit pending).
+**Status**: ✅ done (commit `070dff3`).
 **Deskripsi**: About tab saat ini informative tapi flat. Revamp:
 - App name H1 (22px) + version caption (11px muted).
 - Description dengan max-width supaya tidak full-justify.
