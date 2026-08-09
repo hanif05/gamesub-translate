@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using GameSubTranslate.Config;
 using MouseEventHandler = System.Windows.Input.MouseEventHandler;
 using MouseButtonEventHandler = System.Windows.Input.MouseButtonEventHandler;
+using Border = System.Windows.Controls.Border;
 
 namespace GameSubTranslate.App.Overlay;
 
@@ -207,10 +208,12 @@ public partial class OverlayWindow : Window
         if (!IsVisible || Opacity <= 0.001)
         {
             FadeTo(_settings.OverlayOpacity, 200);
+            SlideIn(); // T66: slide up as we fade in.
         }
         else if (prev != text)
         {
             CrossFade(150);
+            SlideIn();
         }
     }
 
@@ -244,6 +247,50 @@ public partial class OverlayWindow : Window
     private int _fadeDuration;
     private bool _onFadeOutDoneHide;
 
+    // --- T66: entrance slide + pause glow. Slide animates the TextCard RenderTransform Y
+    // from 8 to 0 over 200ms (ease-out) so a new subtitle doesn't pop in. The pause glow
+    // is a Border.BorderBrush loop that pulses opacity 0.3 → 0.6 → 0.3 every 2s.
+    private readonly DispatcherTimer _entranceTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    private double _slideStartY;
+    private double _slideTargetY;
+    private DateTime _slideStart;
+    private int _slideDuration;
+    private bool _slideActive;
+
+    private readonly DispatcherTimer _glowTimer = new() { Interval = TimeSpan.FromMilliseconds(80) };
+    private double _glowPhase;
+    private bool _glowActive;
+
+    public void TriggerGlow(bool on)
+    {
+        _glowActive = on;
+        if (!on)
+        {
+            _glowTimer.Stop();
+            TextCard.ClearValue(Border.BorderBrushProperty);
+            TextCard.ClearValue(Border.BorderThicknessProperty);
+        }
+        else if (!_glowTimer.IsEnabled)
+        {
+            _glowPhase = 0;
+            _glowTimer.Start();
+        }
+    }
+
+    private void TickGlow(object? sender, EventArgs e)
+    {
+        if (!_glowActive) return;
+        _glowPhase += 0.08; // ~2s loop at 80ms tick
+        if (_glowPhase > Math.PI * 2) _glowPhase -= Math.PI * 2;
+        var t = (Math.Sin(_glowPhase) + 1) / 2; // 0..1
+        var opacity = 0.3 + (0.6 - 0.3) * t;
+        var color = System.Windows.Media.Color.FromArgb(
+            (byte)(opacity * 255), 0x7C, 0x8C, 0xFF);
+        var brush = new System.Windows.Media.SolidColorBrush(color);
+        TextCard.BorderBrush = brush;
+        TextCard.BorderThickness = new Thickness(2);
+    }
+
     private void FadeTo(double target, int durationMs, bool hideOnDone = false)
     {
         _targetOpacity = target;
@@ -252,6 +299,35 @@ public partial class OverlayWindow : Window
         _fadeDuration = Math.Max(1, durationMs);
         _onFadeOutDoneHide = hideOnDone && target <= 0.001;
         if (!_fadeTimer.IsEnabled) _fadeTimer.Start();
+    }
+
+    // T66: trigger entrance slide (8px → 0, 200ms ease-out). Called alongside fade-in.
+    private void SlideIn(int durationMs = 200)
+    {
+        _slideStartY = 8;
+        _slideTargetY = 0;
+        _slideStart = DateTime.UtcNow;
+        _slideDuration = Math.Max(1, durationMs);
+        _slideActive = true;
+        SlideTransform.Y = _slideStartY;
+        if (!_entranceTimer.IsEnabled) _entranceTimer.Start();
+    }
+
+    private void TickSlide(object? sender, EventArgs e)
+    {
+        if (!_slideActive) return;
+        var elapsed = (DateTime.UtcNow - _slideStart).TotalMilliseconds;
+        if (elapsed >= _slideDuration)
+        {
+            SlideTransform.Y = _slideTargetY;
+            _slideActive = false;
+            _entranceTimer.Stop();
+            return;
+        }
+        var t = elapsed / _slideDuration;
+        // ease-out: 1 - (1-t)^2
+        var eased = 1 - Math.Pow(1 - t, 2);
+        SlideTransform.Y = _slideStartY + (_slideTargetY - _slideStartY) * eased;
     }
 
     /// <summary>Quick out→in swap so consecutive subtitles don't pop.</summary>
@@ -297,6 +373,8 @@ public partial class OverlayWindow : Window
         _moveTimer.Start();
 
         _fadeTimer.Tick += TickFade;
+        _entranceTimer.Tick += TickSlide; // T66
+        _glowTimer.Tick += TickGlow;       // T66
     }
 
     /// <summary>Click-through is a window style; restore it if we ever suspended it.</summary>
@@ -304,6 +382,8 @@ public partial class OverlayWindow : Window
     {
         _moveTimer.Stop();
         _fadeTimer.Stop();
+        _entranceTimer.Stop();
+        _glowTimer.Stop();
         base.OnClosed(e);
     }
 }
