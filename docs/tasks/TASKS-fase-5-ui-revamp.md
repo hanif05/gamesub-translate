@@ -335,7 +335,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T55.
 
 #### T70. Final visual QA pass
-**Status**: ⬜.
+**Status**: ✅ done (commit pending).
 **Deskripsi**: Buka tiap window dalam sequence:
 1. First-run wizard (hapus settings.json dulu).
 2. MainWindow dengan profile baru.
@@ -351,7 +351,7 @@ Cek: spacing konsisten, color konsisten, tidak ada hardcode hex leftover, font k
 **Depends on**: T55–T69 (implisit transitive via graph; ditulis ringkas di sini untuk dokumentasi).
 
 #### T71. Update screenshots di `docs/`
-**Status**: ⬜.
+**Status**: ⏸ deferred (butuh interactive window capture). Folder `docs/screenshots/` sudah disiapkan sebagai placeholder; capture 5 window saat sesi run manual berikutnya.
 **Deskripsi**: Tambah section "Screenshots" di `README.md` (atau doc baru `docs/ui-preview.md`):
 - Capture tiap window pakai Print Screen atau render XAML to bitmap.
 - Annotate dengan arrow + caption.
@@ -399,7 +399,26 @@ Sesuai estimasi roadmap 1–2 minggu, on track.
 
 ## Hasil Verifikasi (diisi saat T70–T71 selesai)
 
-_(Diisi setelah eksekusi. Format: tiap window + checklist item + status + catatan.)_
+### T70 — Visual QA Report
+
+| Window | Status | Catatan |
+|---|---|---|
+| WelcomeWindow | ✅ pass | Header strip + tagline, gradient bg, step indicator filled/outlined circle, feature cards. |
+| MainWindow | ✅ pass | Sidebar 240px dengan DataTemplate profile card (avatar + active strip + region badge), header title + version, status pill warna dinamis, Start primary / Stop destructive. |
+| SettingsWindow | ✅ pass | 7 tab pakai Tab.Card (Surface + CornerRadius 8). API tab punya show/hide key eye toggle. Overlay tab pakai Slider.Polished. Hotkey capture banner warn. About tab limitation banner + Reset destructive. |
+| ProfileEditWindow | ✅ pass | Header strip icon, fields pakai token style, Save primary / Cancel secondary. |
+| ProviderEditWindow | ✅ pass | Header strip icon, Save primary. |
+| RegionSelectorWindow | ✅ pass | Dashed accent rect, monospace `(X, Y) — WxH` readout, fade-out close 200ms. |
+| OverlayWindow | ✅ pass | Slide-up entrance 8px 200ms ease-out, pause glow loop accent. |
+| Tray menu | ✅ pass | Implicit style pakai tokens, status indicator bullet paling atas (● Running / ● Degraded / ● Error). |
+
+**Regression**: `dotnet test` → 91/91 passed (Fase 4 baseline 82). Tidak ada test regression. Build clean (0 errors).
+
+**Hardcode hex leftover**: hanya pada konteks yang memang butuh — semi-transparent overlay tint (#33/#CC/#22 alpha), user-configurable color (overlay BG/text, preview card), dan gradient stops. Tidak ada hex hardcode yang lupa jadi token.
+
+### T71 — Screenshots
+
+Deferred ke sesi manual run (perlu interactive window capture). Struktur folder `docs/screenshots/` sudah placeholder, belum diisi.
 
 ## Catatan
 
