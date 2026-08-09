@@ -254,7 +254,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.D — Welcome Wizard Revamp
 
 #### T65. Welcome window hero treatment
-**Status**: ⬜.
+**Status**: ✅ done (commit pending).
 **Deskripsi**: Wizard 3-step jadi terasa "onboarding" bukan "form dump":
 - **Header strip** (60px): app name + tagline "Real-time subtitle translation for your games".
 - **Step indicator**: 3 dot horizontal di atas konten — filled = current/done, outlined = upcoming. Transition slide content 150ms cross-fade.
