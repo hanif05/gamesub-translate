@@ -322,7 +322,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.F — Misc & Verification
 
 #### T69. Region selector polish
-**Status**: ✅ done (commit pending).
+**Status**: ✅ done (commit `e011882`).
 **Deskripsi**: `RegionSelectorWindow` (Fase 2 T7) semi-transparent crosshair overlay untuk drag-select capture region. Polish:
 - Crosshair lebih halus (1px line + 8px circle center).
 - Selection rectangle: dashed border `Brush.Accent`, 2px width.
