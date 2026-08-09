@@ -148,26 +148,26 @@ public partial class App : System.Windows.Application
         _trayMenu = new System.Windows.Controls.ContextMenu();
         // T67: status indicator first (non-clickable) so the user sees the pipeline health
         // before any action. Refreshed by RefreshTrayStatus.
-        _statusMenuItem = new MenuItem { Header = "● Idle", IsEnabled = false };
+        _statusMenuItem = MenuItem("● Idle", disabled: true);
         _trayMenu.Items.Add(_statusMenuItem);
-        _trayMenu.Items.Add(new Separator());
-        var overlay = new MenuItem { Header = "Show / Hide Overlay" };
+        _trayMenu.Items.Add(Sep());
+        var overlay = MenuItem("Show / Hide Overlay");
         overlay.Click += (_, _) => ToggleOverlay();
-        var pause = new MenuItem { Header = "Pause / Resume" };
+        var pause = MenuItem("Pause / Resume");
         pause.Click += (_, _) => TogglePause();
-        _regionMenuItem = new MenuItem { Header = "Region" }; // rebuilt on profile change
-        _langMenuItem = new MenuItem { Header = "Target language" }; // T51: quick switch submenu
-        var settings = new MenuItem { Header = "Settings" };
+        _regionMenuItem = MenuItem("Region"); // rebuilt on profile change
+        _langMenuItem = MenuItem("Target language"); // T51: quick switch submenu
+        var settings = MenuItem("Settings");
         settings.Click += (_, _) => OpenSettings();
-        var exit = new MenuItem { Header = "Exit" };
+        var exit = MenuItem("Exit");
         exit.Click += (_, _) => ExitApp();
         _trayMenu.Items.Add(overlay);
         _trayMenu.Items.Add(pause);
         _trayMenu.Items.Add(_regionMenuItem);
         _trayMenu.Items.Add(_langMenuItem);
-        _trayMenu.Items.Add(new Separator());
+        _trayMenu.Items.Add(Sep());
         _trayMenu.Items.Add(settings);
-        _trayMenu.Items.Add(new Separator());
+        _trayMenu.Items.Add(Sep());
         _trayMenu.Items.Add(exit);
         _tray.ContextMenu = _trayMenu;
 
@@ -202,12 +202,8 @@ public partial class App : System.Windows.Application
         var active = _main.ActiveRegionId();
         foreach (var r in regions)
         {
-            var mi = new MenuItem
-            {
-                Header = string.IsNullOrWhiteSpace(r.RegionName) ? r.Display : r.RegionName,
-                IsCheckable = true,
-                IsChecked = r.Id == active,
-            };
+            var mi = MenuItem(string.IsNullOrWhiteSpace(r.RegionName) ? r.Display : r.RegionName,
+                              isCheckable: true, isChecked: r.Id == active);
             int captured = r.Id;
             mi.Click += (_, _) =>
             {
@@ -228,11 +224,43 @@ public partial class App : System.Windows.Application
         _langMenuItem.Items.Clear();
         foreach (var code in TargetLangCycle)
         {
-            var mi = new MenuItem { Header = code, IsCheckable = true, IsChecked = _settings.TargetLang == code };
+            var mi = MenuItem(code, isCheckable: true, isChecked: _settings.TargetLang == code);
             string captured = code;
             mi.Click += (_, _) => SwitchTargetLang(captured);
             _langMenuItem.Items.Add(mi);
         }
+    }
+
+    /// <summary>T73: Hardcodet.NotifyIcon.Wpf's PopupContainer popup doesn't consistently pick
+    /// up implicit Style from App.Resources — set Background/Foreground/Border explicit so
+    /// submenu items stay on-theme regardless of where they sit in the visual tree.</summary>
+    private static MenuItem MenuItem(string header, bool disabled = false,
+                                    bool isCheckable = false, bool isChecked = false)
+    {
+        var mi = new MenuItem
+        {
+            Header = header,
+            IsEnabled = !disabled,
+            IsCheckable = isCheckable,
+            IsChecked = isChecked,
+            // Foreground + Background explicit so the popup can't fall back to SystemColors.
+            Foreground = FindBrush("Brush.Text.Primary"),
+            Background = FindBrush("Brush.Bg.Surface"),
+            BorderBrush = FindBrush("Brush.Border"),
+        };
+        return mi;
+    }
+
+    private static Separator Sep() => new()
+    {
+        Background = FindBrush("Brush.Border"),
+        Foreground = FindBrush("Brush.Border"),
+    };
+
+    private static System.Windows.Media.Brush FindBrush(string key)
+    {
+        if (System.Windows.Application.Current?.Resources[key] is System.Windows.Media.Brush b) return b;
+        return System.Windows.SystemColors.WindowBrush;
     }
 
     /// <summary>T51: switch + save + rebuild pipeline + refresh the menu check marks.</summary>

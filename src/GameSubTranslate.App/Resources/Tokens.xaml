@@ -369,6 +369,17 @@
         <Setter Property="FontSize" Value="{StaticResource Font.Body}"/>
     </Style>
 
+    <!-- F73: override SystemColors.WindowBrush / ControlTextBrush so Hardcodet.NotifyIcon.Wpf's
+         internal PopupContainer popup shell inherits dark theme. The tray ContextMenu lives
+         inside a custom Popup that resolves these brushes via Application.Resources, not our
+         implicit Style. -->
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#FF24242B"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#FFF1F1F4"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#FF24242B"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#FFF1F1F4"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#FF2E2E36"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFF1F1F4"/>
+
     <Style TargetType="{x:Type MenuItem}">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource Brush.Text.Primary}"/>
