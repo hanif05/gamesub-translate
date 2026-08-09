@@ -94,7 +94,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.A — Foundation
 
 #### T55. Design token + global style (App.xaml)
-**Status**: [x].
+**Status**: ✅ done (commit `ccdb9c8`).
 **Deskripsi**: Introduce `App.xaml` resource dictionary yang berisi color brush, font family, spacing, dan implicit `Style` untuk `Button`, `TextBox`, `ComboBox`, `TabItem`, `TabControl`, `ListBox`, `Slider`, `PasswordBox`, `CheckBox`. Setiap window pakai tokens via `{StaticResource Brush.X}` — tidak ada hardcode hex.
 - File terpusat: `src/GameSubTranslate.App/App.xaml` + split jadi `src/GameSubTranslate.App/Resources/Tokens.xaml` kalau mulai panjang.
 - Implicit style override WPF default — semua kontrol di semua window otomatis dapat look baru.
@@ -113,7 +113,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: — (foundation, semua task lain pakai tokens).
 
 #### T56. Window chrome polish (title bar + corner radius)
-**Status**: [x].
+**Status**: ✅ done (commit `f067d8c`).
 **Deskripsi**: Semua window utama (MainWindow, SettingsWindow, WelcomeWindow, ProfileEditWindow, ProviderEditWindow) dapat:
 - `Window.Background = Brush.Bg.Base` (atau `Transparent` untuk overlay-only).
 - `WindowChrome` opsional: kalau mau flat title bar, set `WindowStyle="SingleBorderWindow"` (default) — TIDAK pakai custom chrome.
@@ -126,7 +126,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T55 (tokens).
 
 #### T57. Iconography & emoji polish
-**Status**: [x].
+**Status**: ✅ done (commit `c8e7d95`).
 **Deskripsi**: Tab header emoji saat ini (T48) menggunakan unicode emoji color (Windows Color Emoji). Beberapa user merasa ini tidak cocok dengan tema dark. Pilihan:
 - Pakai monochrome `Segoe Fluent Icons` font (built-in Windows 11) untuk konsistensi visual — codepoint: `� = E713`, `🌐 = E909`, `📷 = E8B8`, `🎨 = E8B1`, `⌨ = E765`, `🎮 = E7FC`, `ℹ = E946`.
 - Tulis converter kecil `IconToTextConverter` atau pakai langsung `<Run FontFamily="Segoe Fluent Icons">` inline.
