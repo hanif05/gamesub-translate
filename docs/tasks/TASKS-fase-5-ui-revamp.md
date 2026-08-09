@@ -304,7 +304,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T55, T49 (Fase 4).
 
 #### T68. Profile edit + provider edit dialog polish
-**Status**: ⬜.
+**Status**: ✅ done (commit pending).
 **Deskripsi**: `ProfileEditWindow` dan `ProviderEditWindow` saat ini form Grid polos. Apply consistent form styling:
 - Header strip dengan nama window + icon.
 - Form fields pakai label + input dengan caption helper text di bawah.
