@@ -335,7 +335,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T55.
 
 #### T70. Final visual QA pass
-**Status**: ✅ done (commit pending).
+**Status**: ✅ done (commit `c60f9af`).
 **Deskripsi**: Buka tiap window dalam sequence:
 1. First-run wizard (hapus settings.json dulu).
 2. MainWindow dengan profile baru.
