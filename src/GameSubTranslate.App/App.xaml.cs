@@ -43,6 +43,17 @@ public partial class App : System.Windows.Application
         {
             var ex = ev.ExceptionObject as Exception;
             Console.Error.WriteLine($"[unhandled] {ex}");
+            TryWriteCrash(ex);
+        };
+        // WPF UI-thread exceptions (anything that bubbles out of a button click, XAML parse,
+        // property setter, etc.) → log to %APPDATA%\GameSubTranslate\crash.log so the user
+        // can show us the stack trace next time Settings (or any other window) blows up.
+        DispatcherUnhandledException += (_, ev) =>
+        {
+            Console.Error.WriteLine($"[ui-unhandled] {ev.Exception}");
+            TryWriteCrash(ev.Exception);
+            // Don't mark Handled — let WPF take the default action (process exit) so the
+            // user sees the same crash they reported. We just want a paper trail.
         };
         base.OnStartup(e);
         ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
@@ -445,5 +456,27 @@ public partial class App : System.Windows.Application
         _tray?.Dispose();
         _logger.Dispose();
         base.OnExit(e);
+    }
+
+    /// <summary>Best-effort crash dump so the user can attach the stack trace to a bug report.
+    /// Writes to %APPDATA%\GameSubTranslate\crash.log (appended, truncated to 64 KB).</summary>
+    private static void TryWriteCrash(Exception? ex)
+    {
+        if (ex is null) return;
+        try
+        {
+            var dir = System.IO.Path.Combine(
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
+                "GameSubTranslate");
+            System.IO.Directory.CreateDirectory(dir);
+            var path = System.IO.Path.Combine(dir, "crash.log");
+            var stamp = System.DateTime.UtcNow.ToString("O");
+            var entry = $"--- {stamp} ---\n{ex}\n";
+            var existing = System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : "";
+            var combined = existing + entry;
+            if (combined.Length > 65536) combined = combined[^65536..];
+            System.IO.File.WriteAllText(path, combined);
+        }
+        catch { /* paper trail is best-effort */ }
     }
 }
