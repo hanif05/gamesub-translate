@@ -288,7 +288,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T47 (Fase 4), T55 (untuk glow color).
 
 #### T67. Tray menu polish
-**Status**: ⬜.
+**Status**: ✅ done (commit pending).
 **Deskripsi**: Tray menu (`ContextMenu`) saat ini pakai WPF default. Revamp:
 - Submenu region/target lang: pakai item template dengan icon kecil (globe untuk language, region shape untuk region).
 - Spacing per item lebih lega (Padding 8,4) supaya tidak cramped.

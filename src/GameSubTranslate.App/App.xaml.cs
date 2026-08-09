@@ -24,6 +24,9 @@ public partial class App : System.Windows.Application
     private ContextMenu? _trayMenu;
     private MenuItem? _regionMenuItem;
     private MenuItem? _langMenuItem;
+    // T67: status indicator surfaced as the topmost menu item — non-clickable bullet
+    // whose color tracks TrayStatus. Updates live via RefreshTrayStatus.
+    private MenuItem? _statusMenuItem;
     private ForegroundWatcher? _fgWatcher;
     private AppSettings _settings = new();
     private FileLogger _logger = new();
@@ -143,6 +146,11 @@ public partial class App : System.Windows.Application
         _tray.Visibility = System.Windows.Visibility.Visible;
 
         _trayMenu = new System.Windows.Controls.ContextMenu();
+        // T67: status indicator first (non-clickable) so the user sees the pipeline health
+        // before any action. Refreshed by RefreshTrayStatus.
+        _statusMenuItem = new MenuItem { Header = "● Idle", IsEnabled = false };
+        _trayMenu.Items.Add(_statusMenuItem);
+        _trayMenu.Items.Add(new Separator());
         var overlay = new MenuItem { Header = "Show / Hide Overlay" };
         overlay.Click += (_, _) => ToggleOverlay();
         var pause = new MenuItem { Header = "Pause / Resume" };
@@ -258,13 +266,25 @@ public partial class App : System.Windows.Application
         if (_trayLastError is not null)
             _tray.ToolTipText += $"\n⚠ {_trayLastError}";
         else if (_trayDegraded)
-            _tray.ToolTipText += "\n⚠ degraded — running on fallback provider";
+            _tray.ToolTipText += "\n� degraded — running on fallback provider";
 
         var status = _trayLastError is not null ? TrayStatus.Error
                    : _trayDegraded ? TrayStatus.Degraded
                    : TrayStatus.Ok;
         _tray.Icon?.Dispose(); // release the previous HICON — FromHandle doesn't free its source
         _tray.Icon = BuildTrayIcon(status);
+
+        // T67: keep the in-menu status bullet in sync with the icon color.
+        if (_statusMenuItem is not null)
+        {
+            var label = status switch
+            {
+                TrayStatus.Degraded => "● Degraded — running on fallback",
+                TrayStatus.Error => "● Error — see tooltip",
+                _ => string.IsNullOrEmpty(profile) ? "● Idle — no profile" : $"● Running on {profile}",
+            };
+            _statusMenuItem.Header = label;
+        }
     }
 
     /// <summary>T25: foreground game matched → select its profile (first-match). Won't rebuild an already-running pipeline mid-game.</summary>
