@@ -275,7 +275,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.E — Overlay & Tray Polish
 
 #### T66. Overlay subtle entrance animation
-**Status**: ✅ done (commit pending).
+**Status**: ✅ done (commit `0d1bc4e`).
 **Deskripsi**: Overlay sudah punya fade in/out (T47). Tambah:
 - Subtitle baru muncul dengan slide-up animation 8px (200ms ease-out) — combine dengan fade in.
 - Saat text berubah (cross-fade), text baru slide-up, text lama slide-down 4px — feels "subtle scroll" bukan pop.
