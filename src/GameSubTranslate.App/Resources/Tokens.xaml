@@ -380,9 +380,18 @@
                 <ControlTemplate TargetType="{x:Type MenuItem}">
                     <Border x:Name="Bd" Background="{TemplateBinding Background}"
                             Padding="{TemplateBinding Padding}">
-                        <ContentPresenter ContentSource="Header"
-                                          RecognizesAccessKey="True"
-                                          VerticalAlignment="Center"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="MenuItemIconColumn"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter Grid.Column="0" ContentSource="Icon"
+                                              Width="16" Height="16" Margin="0,0,8,0"
+                                              VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            <ContentPresenter Grid.Column="1" ContentSource="Header"
+                                              RecognizesAccessKey="True"
+                                              VerticalAlignment="Center"/>
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
