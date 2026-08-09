@@ -44,8 +44,8 @@
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE713;" FontSize="14"/>
-                        <Run Text=" API &amp; Model"/>
+                        <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE713;" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Text=" API &amp; Model" Margin="4,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </TabItem.Header>
                 <Border Style="{StaticResource Tab.Card}">
@@ -70,7 +70,7 @@
                             <Button x:Name="ToggleApiKeyVisibilityBtn" Grid.Column="1" Margin="6,0,0,0"
                                     Width="36" Click="ToggleApiKeyVisibility_Click"
                                     ToolTip="Show / hide API key">
-                                <Run FontFamily="Segoe Fluent Icons" x:Name="ApiKeyEyeIcon" Text="&#xE7B3;" FontSize="14"/>
+                                <TextBlock x:Name="ApiKeyEyeIcon" FontFamily="Segoe Fluent Icons" Text="&#xE7B3;" FontSize="14"/>
                             </Button>
                         </Grid>
                         <TextBlock x:Name="ApiKeyHelper" Style="{StaticResource Text.Helper}">
@@ -93,11 +93,11 @@
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                 <Button x:Name="ProviderUpBtn" Width="32" Margin="6,0,2,0"
                                         Click="ProviderUp_Click" ToolTip="Move up (higher priority)">
-                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE74A;" FontSize="12"/>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE74A;" FontSize="12"/>
                                 </Button>
                                 <Button x:Name="ProviderDownBtn" Width="32" Margin="0,0,2,0"
                                         Click="ProviderDown_Click" ToolTip="Move down (lower priority)">
-                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE74B;" FontSize="12"/>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE74B;" FontSize="12"/>
                                 </Button>
                                 <Button Content="Add" Width="60" Margin="6,0,4,0" Click="ProviderAdd_Click"/>
                                 <Button Content="Edit" Width="60" Margin="0,0,4,0" Click="ProviderEdit_Click"/>
@@ -116,8 +116,8 @@
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE909;" FontSize="14"/>
-                        <Run Text=" Language"/>
+                        <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE909;" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Text=" Language" Margin="4,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </TabItem.Header>
                 <Border Style="{StaticResource Tab.Card}">
@@ -157,8 +157,8 @@
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE8B8;" FontSize="14"/>
-                        <Run Text=" Capture"/>
+                        <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE8B8;" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Text=" Capture" Margin="4,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </TabItem.Header>
                 <Border Style="{StaticResource Tab.Card}">
@@ -189,8 +189,8 @@
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE8B1;" FontSize="14"/>
-                        <Run Text=" Overlay"/>
+                        <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE8B1;" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Text=" Overlay" Margin="4,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </TabItem.Header>
                 <Border Style="{StaticResource Tab.Card}">
@@ -214,11 +214,11 @@
                                            VerticalAlignment="Center" Width="32"/>
                                 <Button x:Name="FontSizePlus" Width="28" Margin="6,0,0,0" Click="FontSizePlus_Click"
                                         ToolTip="Increase">
-                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE710;" FontSize="12"/>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE710;" FontSize="12"/>
                                 </Button>
                                 <Button x:Name="FontSizeMinus" Width="28" Margin="4,0,0,0" Click="FontSizeMinus_Click"
                                         ToolTip="Decrease">
-                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE738;" FontSize="12"/>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE738;" FontSize="12"/>
                                 </Button>
                             </StackPanel>
 
@@ -226,12 +226,12 @@
                             <DockPanel Margin="0,4,0,0">
                                 <TextBox x:Name="TextColorBox" Width="110" Margin="0,0,8,0" TextChanged="OverlayStyle_Changed"/>
                                 <Button x:Name="TextColorBtn" Width="36" Click="TextColor_Click" ToolTip="Pick color">
-                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE790;" FontSize="12"/>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE790;" FontSize="12"/>
                                 </Button>
                                 <TextBlock Text="Background" FontWeight="SemiBold" VerticalAlignment="Center" Margin="20,0,0,0"/>
                                 <TextBox x:Name="BgColorBox" Width="110" Margin="8,0" VerticalAlignment="Center" TextChanged="OverlayStyle_Changed"/>
                                 <Button x:Name="BgColorBtn" Width="36" Click="BgColor_Click" ToolTip="Pick color">
-                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE790;" FontSize="12"/>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE790;" FontSize="12"/>
                                 </Button>
                             </DockPanel>
 
@@ -272,8 +272,8 @@
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE765;" FontSize="14"/>
-                        <Run Text=" Hotkeys"/>
+                        <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE765;" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Text=" Hotkeys" Margin="4,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </TabItem.Header>
                 <Border Style="{StaticResource Tab.Card}">
@@ -281,8 +281,8 @@
                         <DockPanel Margin="0,0,0,8">
                             <Button x:Name="ToggleHotkeyBtn" DockPanel.Dock="Right" Width="90" Click="ToggleHotkey_Change">
                                 <StackPanel Orientation="Horizontal">
-                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
-                                    <Run Text=" Change"/>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
+                                    <TextBlock Text=" Change" Margin="4,0,0,0"/>
                                 </StackPanel>
                             </Button>
                             <TextBlock Text="Toggle overlay" VerticalAlignment="Center"/>
@@ -292,8 +292,8 @@
                         <DockPanel Margin="0,0,0,8">
                             <Button x:Name="PauseHotkeyBtn" DockPanel.Dock="Right" Width="90" Click="PauseHotkey_Change">
                                 <StackPanel Orientation="Horizontal">
-                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
-                                    <Run Text=" Change"/>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
+                                    <TextBlock Text=" Change" Margin="4,0,0,0"/>
                                 </StackPanel>
                             </Button>
                             <TextBlock Text="Pause / resume capture" VerticalAlignment="Center"/>
@@ -303,8 +303,8 @@
                         <DockPanel Margin="0,0,0,8">
                             <Button x:Name="SettingsHotkeyBtn" DockPanel.Dock="Right" Width="90" Click="SettingsHotkey_Change">
                                 <StackPanel Orientation="Horizontal">
-                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
-                                    <Run Text=" Change"/>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
+                                    <TextBlock Text=" Change" Margin="4,0,0,0"/>
                                 </StackPanel>
                             </Button>
                             <TextBlock Text="Open settings" VerticalAlignment="Center"/>
@@ -314,8 +314,8 @@
                         <DockPanel Margin="0,0,0,8">
                             <Button x:Name="ManualHotkeyBtn" DockPanel.Dock="Right" Width="90" Click="ManualHotkey_Change">
                                 <StackPanel Orientation="Horizontal">
-                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
-                                    <Run Text=" Change"/>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
+                                    <TextBlock Text=" Change" Margin="4,0,0,0"/>
                                 </StackPanel>
                             </Button>
                             <TextBlock Text="Manual capture" VerticalAlignment="Center"/>
@@ -325,8 +325,8 @@
                         <DockPanel>
                             <Button x:Name="CycleLangHotkeyBtn" DockPanel.Dock="Right" Width="90" Click="CycleLangHotkey_Change">
                                 <StackPanel Orientation="Horizontal">
-                                    <Run FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
-                                    <Run Text=" Change"/>
+                                    <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE70F;" FontSize="12"/>
+                                    <TextBlock Text=" Change" Margin="4,0,0,0"/>
                                 </StackPanel>
                             </Button>
                             <TextBlock Text="Cycle target language" VerticalAlignment="Center"/>
@@ -346,8 +346,8 @@
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE7FC;" FontSize="14"/>
-                        <Run Text=" Profiles"/>
+                        <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE7FC;" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Text=" Profiles" Margin="4,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </TabItem.Header>
                 <Border Style="{StaticResource Tab.Card}">
@@ -369,8 +369,8 @@
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <Run FontFamily="Segoe Fluent Icons" Text="&#xE946;" FontSize="14"/>
-                        <Run Text=" About"/>
+                        <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE946;" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Text=" About" Margin="4,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </TabItem.Header>
                 <Border Style="{StaticResource Tab.Card}">

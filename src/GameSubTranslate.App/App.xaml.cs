@@ -63,12 +63,22 @@ public partial class App : System.Windows.Application
         // deadlock against the WPF dispatcher (sync-over-async on the UI thread = trap).
         if (e.Args.Length > 0 && e.Args[0].StartsWith("--selfcheck"))
         {
-            // Run on thread pool so .GetAwaiter().GetResult() inside the self-check doesn't
-            // deadlock against the WPF dispatcher (sync-over-async on UI thread = trap).
+            // Window-based checks need the STA dispatcher thread (Task.Run → MTA pool → WPF
+            // Window ctor throws "calling thread must be STA"). --selfcheck-settings is a
+            // pure sync ctor smoke test, safe to run inline on the startup thread. Everything
+            // else goes to the thread pool because those checks call .GetAwaiter().GetResult()
+            // which would deadlock against the dispatcher if run on the UI thread.
             int rc = 2; // generic failure if the task itself faults
             try
             {
-                rc = Task.Run(() => SelfChecks.Run(e.Args[0])).GetAwaiter().GetResult();
+                if (e.Args[0] == "--selfcheck-settings")
+                {
+                    rc = SelfChecks.Run("--selfcheck-settings");
+                }
+                else
+                {
+                    rc = Task.Run(() => SelfChecks.Run(e.Args[0])).GetAwaiter().GetResult();
+                }
             }
             catch (Exception ex)
             {

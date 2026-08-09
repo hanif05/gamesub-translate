@@ -61,6 +61,9 @@ internal static class SelfChecks
             "--selfcheck-t39" => SelfCheckT39(),
             "--selfcheck-t40" => SelfCheckT40(),
             "--selfcheck-t41" => SelfCheckT41(),
+            // T75: STA-only smoke test — instantiates SettingsWindow (catches the `<Run>`-in-
+            // StackPanel XAML crash). Run on the UI thread, not the thread pool.
+            "--selfcheck-settings" => SelfCheckSettingsWindow(),
             _ => SelfCheckT14(),
         };
     }
@@ -264,6 +267,26 @@ internal static class SelfChecks
             ? "PASS: SettingsWindow tabs + hotkey format + settings round-trip"
             : $"FAIL: {fails} settings checks failed");
         return fails == 0 ? 0 : 1;
+    }
+
+    /// <summary>T75: XAML smoke test. Instantiates SettingsWindow (constructor → InitializeComponent
+    /// → all tabs + inline content parsed). Catches the `<Run>`-in-`StackPanel` crash that killed
+    /// OpenSettings. Must run on the STA UI thread (see App.OnStartup).</summary>
+    private static int SelfCheckSettingsWindow()
+    {
+        try
+        {
+            var settings = new SettingsWindow(overlay: null);
+            settings.Show();
+            settings.Close();
+            Console.WriteLine("PASS: SettingsWindow XAML loads (all tabs parsed)");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"FAIL: SettingsWindow XAML — {ex.Message}");
+            return 1;
+        }
     }
 
     private static int SelfCheckT25()
