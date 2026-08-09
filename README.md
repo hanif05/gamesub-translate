@@ -11,7 +11,8 @@ Lihat [`PRD-Auto-Translate-Subtitle-Game.md`](PRD-Auto-Translate-Subtitle-Game.m
 | 1 — Prototype (console, end-to-end) | ✅ Done | `docs/tasks/TASKS-fase-1-prototype.md` |
 | 2 — MVP Overlay (WPF click-through) | ✅ Done | `docs/tasks/TASKS-fase-2-mvp-overlay.md` |
 | 3 — Optimisasi (testing, caching, streaming, failover) | ✅ Done | `docs/tasks/TASKS-fase-3-optimisasi.md` |
-| 4 — Polish & Packaging (installer, UI polish, presets) | ⏳ Next | `docs/tasks/TASKS-fase-4-polish.md` |
+| 4 — Polish & Packaging (installer, UI polish, presets) | ✅ Done | `docs/tasks/TASKS-fase-4-polish.md` |
+| 5 — UI Revamp (design tokens, Segoe Fluent Icons, animations) | ✅ Done | `docs/tasks/TASKS-fase-5-ui-revamp.md` |
 
 ## Tech Stack
 
@@ -34,17 +35,19 @@ Lihat [`PRD-Auto-Translate-Subtitle-Game.md`](PRD-Auto-Translate-Subtitle-Game.m
 │   ├── GameSubTranslate.Core/        ← classlib: Capture, Ocr, Pipeline, Translation, Config, Storage, Profiles, Cache, Logging
 │   └── GameSubTranslate.App/         ← WPF: MainWindow, ProfileEdit, RegionSelector, Overlay, Settings, Hotkeys, Onboarding
 ├── tests/
-│   └── GameSubTranslate.Core.Tests/  ← xUnit (79 tests: ChangeDetector, TranslationClient, SettingsStore, TranslationCache, streaming, FileLogger, Ocr engines, failover)
+│   └── GameSubTranslate.Core.Tests/  ← xUnit (91 tests: ChangeDetector, TranslationClient, SettingsStore, TranslationCache, streaming, FileLogger, Ocr engines, failover, + Fase 5 UI helpers)
 ├── assets/tessdata/                  eng.traineddata
 ├── installer/                        (Fase 4) Inno Setup script + publish output
 ├── docs/
 │   ├── PRD-Auto-Translate-Subtitle-Game.md
 │   ├── game-presets.md               (Fase 4) preset region per game populer
+│   ├── screenshots/                  (Fase 5) target file list untuk capture manual tiap window
 │   └── tasks/
 │       ├── TASKS-fase-1-prototype.md
 │       ├── TASKS-fase-2-mvp-overlay.md
 │       ├── TASKS-fase-3-optimisasi.md
-│       └── TASKS-fase-4-polish.md
+│       ├── TASKS-fase-4-polish.md
+│       └── TASKS-fase-5-ui-revamp.md
 ├── GameSubTranslate.sln
 ├── CLAUDE.md                         ruleset untuk AI assistant
 └── README.md
@@ -122,13 +125,19 @@ done
 
 ## Tests
 
-xUnit suite (79 tests, sejak Fase 3):
+xUnit suite (91 tests, sejak Fase 3 + Fase 5):
 
 ```bash
 dotnet test
 ```
 
-Coverage: `ChangeDetector`, `TranslationClient` (retry/timeout/error kategori/failover), `TranslationStream`, `SettingsStore` (DPAPI + JSON), `TranslationCache` (exact + fuzzy + Levenshtein), `FileLogger` (rotation), `TesseractOcrEngine` + `VisionAiOcrEngine`.
+Coverage: `ChangeDetector`, `TranslationClient` (retry/timeout/error kategori/failover), `TranslationStream`, `SettingsStore` (DPAPI + JSON), `TranslationCache` (exact + fuzzy + Levenshtein), `FileLogger` (rotation), `TesseractOcrEngine` + `VisionAiOcrEngine`, `MaskLayer`-style converter helpers (Fase 5).
+
+## UI Design System (Fase 5)
+
+Sejak Fase 5, semua styling WPF pakai design tokens terpusat di `src/GameSubTranslate.App/Resources/Tokens.xaml` (color, font, spacing, radius, shadow). Implicit style untuk `Button`, `TextBox`, `PasswordBox`, `ComboBox`, `CheckBox`, `ListBox`, `TabControl`, `Slider`, `Window`. Named style: `Button.Primary`, `Button.Destructive`, `Slider.Polished`, `Tab.Card`, `Banner.Warn`, `Text.Helper`, `Font.Icon`. Iconography pakai **Segoe Fluent Icons** (built-in Win11), monospace U+E codepoint — no emoji, no font file tambahan.
+
+Animasi pakai `DispatcherTimer` 16ms (60fps): overlay entrance slide (200ms ease-out) + pause-state glow pulse loop.
 
 ## Contributing
 
