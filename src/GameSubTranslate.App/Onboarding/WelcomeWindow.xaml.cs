@@ -28,24 +28,7 @@ public partial class WelcomeWindow : Window
         ModelBox.Text = _settings.Model ?? "";
         SelectCombo(TargetLangBox, _settings.TargetLang);
 
-        Hyperlink_OnRequestNavigate(this, OpenAiDocLink);
-        Hyperlink_OnRequestNavigate(this, OpenRouterDocLink);
-
         ShowStep(1);
-    }
-
-    private static void Hyperlink_OnRequestNavigate(Window owner, Hyperlink link)
-    {
-        // The RequestNavigate event uses the sender's Uri; capture by name.
-        link.RequestNavigate += (_, e) =>
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
-                e.Handled = true;
-            }
-            catch { /* swallow — link is best-effort */ }
-        };
     }
 
     private static void SelectCombo(System.Windows.Controls.ComboBox box, string value)
@@ -69,6 +52,10 @@ public partial class WelcomeWindow : Window
         Step3.Visibility = Visibility.Collapsed;
         BackBtn.IsEnabled = step > 1;
         NextBtn.Content = step == 3 ? "Finish" : "Next";
+        // F57: filled = current/done, outlined = upcoming. EA3A = filled circle, EA3B = outlined circle.
+        Dot1.Text = step >= 1 ? "" : "";
+        Dot2.Text = step >= 2 ? "" : "";
+        Dot3.Text = step >= 3 ? "" : "";
         switch (step)
         {
             case 1:

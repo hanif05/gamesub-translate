@@ -24,6 +24,9 @@ public partial class App : System.Windows.Application
     private ContextMenu? _trayMenu;
     private MenuItem? _regionMenuItem;
     private MenuItem? _langMenuItem;
+    // T67: status indicator surfaced as the topmost menu item — non-clickable bullet
+    // whose color tracks TrayStatus. Updates live via RefreshTrayStatus.
+    private MenuItem? _statusMenuItem;
     private ForegroundWatcher? _fgWatcher;
     private AppSettings _settings = new();
     private FileLogger _logger = new();
@@ -40,6 +43,17 @@ public partial class App : System.Windows.Application
         {
             var ex = ev.ExceptionObject as Exception;
             Console.Error.WriteLine($"[unhandled] {ex}");
+            TryWriteCrash(ex);
+        };
+        // WPF UI-thread exceptions (anything that bubbles out of a button click, XAML parse,
+        // property setter, etc.) → log to %APPDATA%\GameSubTranslate\crash.log so the user
+        // can show us the stack trace next time Settings (or any other window) blows up.
+        DispatcherUnhandledException += (_, ev) =>
+        {
+            Console.Error.WriteLine($"[ui-unhandled] {ev.Exception}");
+            TryWriteCrash(ev.Exception);
+            // Don't mark Handled — let WPF take the default action (process exit) so the
+            // user sees the same crash they reported. We just want a paper trail.
         };
         base.OnStartup(e);
         ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
@@ -49,12 +63,22 @@ public partial class App : System.Windows.Application
         // deadlock against the WPF dispatcher (sync-over-async on the UI thread = trap).
         if (e.Args.Length > 0 && e.Args[0].StartsWith("--selfcheck"))
         {
-            // Run on thread pool so .GetAwaiter().GetResult() inside the self-check doesn't
-            // deadlock against the WPF dispatcher (sync-over-async on UI thread = trap).
+            // Window-based checks need the STA dispatcher thread (Task.Run → MTA pool → WPF
+            // Window ctor throws "calling thread must be STA"). --selfcheck-settings is a
+            // pure sync ctor smoke test, safe to run inline on the startup thread. Everything
+            // else goes to the thread pool because those checks call .GetAwaiter().GetResult()
+            // which would deadlock against the dispatcher if run on the UI thread.
             int rc = 2; // generic failure if the task itself faults
             try
             {
-                rc = Task.Run(() => SelfChecks.Run(e.Args[0])).GetAwaiter().GetResult();
+                if (e.Args[0] == "--selfcheck-settings")
+                {
+                    rc = SelfChecks.Run("--selfcheck-settings");
+                }
+                else
+                {
+                    rc = Task.Run(() => SelfChecks.Run(e.Args[0])).GetAwaiter().GetResult();
+                }
             }
             catch (Exception ex)
             {
@@ -143,23 +167,28 @@ public partial class App : System.Windows.Application
         _tray.Visibility = System.Windows.Visibility.Visible;
 
         _trayMenu = new System.Windows.Controls.ContextMenu();
-        var overlay = new MenuItem { Header = "Show / Hide Overlay" };
+        // T67: status indicator first (non-clickable) so the user sees the pipeline health
+        // before any action. Refreshed by RefreshTrayStatus.
+        _statusMenuItem = MenuItem("● Idle", disabled: true);
+        _trayMenu.Items.Add(_statusMenuItem);
+        _trayMenu.Items.Add(Sep());
+        var overlay = MenuItem("Show / Hide Overlay");
         overlay.Click += (_, _) => ToggleOverlay();
-        var pause = new MenuItem { Header = "Pause / Resume" };
+        var pause = MenuItem("Pause / Resume");
         pause.Click += (_, _) => TogglePause();
-        _regionMenuItem = new MenuItem { Header = "Region" }; // rebuilt on profile change
-        _langMenuItem = new MenuItem { Header = "Target language" }; // T51: quick switch submenu
-        var settings = new MenuItem { Header = "Settings" };
+        _regionMenuItem = MenuItem("Region"); // rebuilt on profile change
+        _langMenuItem = MenuItem("Target language"); // T51: quick switch submenu
+        var settings = MenuItem("Settings");
         settings.Click += (_, _) => OpenSettings();
-        var exit = new MenuItem { Header = "Exit" };
+        var exit = MenuItem("Exit");
         exit.Click += (_, _) => ExitApp();
         _trayMenu.Items.Add(overlay);
         _trayMenu.Items.Add(pause);
         _trayMenu.Items.Add(_regionMenuItem);
         _trayMenu.Items.Add(_langMenuItem);
-        _trayMenu.Items.Add(new Separator());
+        _trayMenu.Items.Add(Sep());
         _trayMenu.Items.Add(settings);
-        _trayMenu.Items.Add(new Separator());
+        _trayMenu.Items.Add(Sep());
         _trayMenu.Items.Add(exit);
         _tray.ContextMenu = _trayMenu;
 
@@ -194,12 +223,8 @@ public partial class App : System.Windows.Application
         var active = _main.ActiveRegionId();
         foreach (var r in regions)
         {
-            var mi = new MenuItem
-            {
-                Header = string.IsNullOrWhiteSpace(r.RegionName) ? r.Display : r.RegionName,
-                IsCheckable = true,
-                IsChecked = r.Id == active,
-            };
+            var mi = MenuItem(string.IsNullOrWhiteSpace(r.RegionName) ? r.Display : r.RegionName,
+                              isCheckable: true, isChecked: r.Id == active);
             int captured = r.Id;
             mi.Click += (_, _) =>
             {
@@ -220,11 +245,43 @@ public partial class App : System.Windows.Application
         _langMenuItem.Items.Clear();
         foreach (var code in TargetLangCycle)
         {
-            var mi = new MenuItem { Header = code, IsCheckable = true, IsChecked = _settings.TargetLang == code };
+            var mi = MenuItem(code, isCheckable: true, isChecked: _settings.TargetLang == code);
             string captured = code;
             mi.Click += (_, _) => SwitchTargetLang(captured);
             _langMenuItem.Items.Add(mi);
         }
+    }
+
+    /// <summary>T73: Hardcodet.NotifyIcon.Wpf's PopupContainer popup doesn't consistently pick
+    /// up implicit Style from App.Resources — set Background/Foreground/Border explicit so
+    /// submenu items stay on-theme regardless of where they sit in the visual tree.</summary>
+    private static MenuItem MenuItem(string header, bool disabled = false,
+                                    bool isCheckable = false, bool isChecked = false)
+    {
+        var mi = new MenuItem
+        {
+            Header = header,
+            IsEnabled = !disabled,
+            IsCheckable = isCheckable,
+            IsChecked = isChecked,
+            // Foreground + Background explicit so the popup can't fall back to SystemColors.
+            Foreground = FindBrush("Brush.Text.Primary"),
+            Background = FindBrush("Brush.Bg.Surface"),
+            BorderBrush = FindBrush("Brush.Border"),
+        };
+        return mi;
+    }
+
+    private static Separator Sep() => new()
+    {
+        Background = FindBrush("Brush.Border"),
+        Foreground = FindBrush("Brush.Border"),
+    };
+
+    private static System.Windows.Media.Brush FindBrush(string key)
+    {
+        if (System.Windows.Application.Current?.Resources[key] is System.Windows.Media.Brush b) return b;
+        return System.Windows.SystemColors.WindowBrush;
     }
 
     /// <summary>T51: switch + save + rebuild pipeline + refresh the menu check marks.</summary>
@@ -258,13 +315,25 @@ public partial class App : System.Windows.Application
         if (_trayLastError is not null)
             _tray.ToolTipText += $"\n⚠ {_trayLastError}";
         else if (_trayDegraded)
-            _tray.ToolTipText += "\n⚠ degraded — running on fallback provider";
+            _tray.ToolTipText += "\n� degraded — running on fallback provider";
 
         var status = _trayLastError is not null ? TrayStatus.Error
                    : _trayDegraded ? TrayStatus.Degraded
                    : TrayStatus.Ok;
         _tray.Icon?.Dispose(); // release the previous HICON — FromHandle doesn't free its source
         _tray.Icon = BuildTrayIcon(status);
+
+        // T67: keep the in-menu status bullet in sync with the icon color.
+        if (_statusMenuItem is not null)
+        {
+            var label = status switch
+            {
+                TrayStatus.Degraded => "● Degraded — running on fallback",
+                TrayStatus.Error => "● Error — see tooltip",
+                _ => string.IsNullOrEmpty(profile) ? "● Idle — no profile" : $"● Running on {profile}",
+            };
+            _statusMenuItem.Header = label;
+        }
     }
 
     /// <summary>T25: foreground game matched → select its profile (first-match). Won't rebuild an already-running pipeline mid-game.</summary>
@@ -397,5 +466,27 @@ public partial class App : System.Windows.Application
         _tray?.Dispose();
         _logger.Dispose();
         base.OnExit(e);
+    }
+
+    /// <summary>Best-effort crash dump so the user can attach the stack trace to a bug report.
+    /// Writes to %APPDATA%\GameSubTranslate\crash.log (appended, truncated to 64 KB).</summary>
+    private static void TryWriteCrash(Exception? ex)
+    {
+        if (ex is null) return;
+        try
+        {
+            var dir = System.IO.Path.Combine(
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData),
+                "GameSubTranslate");
+            System.IO.Directory.CreateDirectory(dir);
+            var path = System.IO.Path.Combine(dir, "crash.log");
+            var stamp = System.DateTime.UtcNow.ToString("O");
+            var entry = $"--- {stamp} ---\n{ex}\n";
+            var existing = System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : "";
+            var combined = existing + entry;
+            if (combined.Length > 65536) combined = combined[^65536..];
+            System.IO.File.WriteAllText(path, combined);
+        }
+        catch { /* paper trail is best-effort */ }
     }
 }

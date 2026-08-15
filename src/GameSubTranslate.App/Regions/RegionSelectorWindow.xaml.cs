@@ -109,8 +109,23 @@ public partial class RegionSelectorWindow : Window
             Height = (int)Math.Round(h),
             MonitorIndex = ActiveMonitorIndex,
         };
-        DialogResult = true;
-        Close();
+        // T69: fade out 200ms before close so the dismissal isn't jarring.
+        FadeOutAndClose();
+    }
+
+    private void FadeOutAndClose()
+    {
+        IsHitTestVisible = false;
+        var fade = new System.Windows.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(16) };
+        var start = System.DateTime.UtcNow;
+        var startOp = Opacity;
+        fade.Tick += (_, _) =>
+        {
+            var t = (System.DateTime.UtcNow - start).TotalMilliseconds / 200.0;
+            if (t >= 1) { Opacity = 0; fade.Stop(); DialogResult = true; Close(); return; }
+            Opacity = startOp * (1 - t);
+        };
+        fade.Start();
     }
 
     private void CanvasSetRect(Point a, Point b)
@@ -130,7 +145,8 @@ public partial class RegionSelectorWindow : Window
         var y = (int)Math.Min(a.Y, b.Y);
         var w = (int)Math.Abs(b.X - a.X);
         var h = (int)Math.Abs(b.Y - a.Y);
-        return $"x={x} y={y} w={w} h={h}";
+        // T69: PRD format — (X, Y) — W×H.
+        return $"({x}, {y}) — {w}x{h}";
     }
 
     protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)

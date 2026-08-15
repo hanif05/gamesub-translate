@@ -14,6 +14,9 @@ public sealed class GlobalHotkeyManager : IDisposable
     private const int WM_HOTKEY = 0x0312;
     private const int IdBase = 0xC000; // 0xC000-0xFFFF is the range reserved for applications
 
+    private const int WS_POPUP = unchecked((int)0x80000000);
+    private const int WS_EX_TOOLWINDOW = 0x00000080;
+
     private readonly HwndSource _source;
     private readonly Dictionary<string, Registration> _regs = new();
     private int _nextId = IdBase;
@@ -22,7 +25,18 @@ public sealed class GlobalHotkeyManager : IDisposable
 
     public GlobalHotkeyManager()
     {
-        _source = new HwndSource(new HwndSourceParameters("GameSubTranslate.HotkeyHost"));
+        // T76: the raw HwndSourceParameters ctor makes a top-level ownerless window that shows
+        // up in the taskbar + Alt-Tab as "GameSubTranslate.HotkeyHost". Give it a real window
+        // class so it's invisible, tool-window-styled (no taskbar button), and non-activating.
+        _source = new HwndSource(new HwndSourceParameters("GameSubTranslate.HotkeyHost")
+        {
+            WindowStyle = WS_POPUP,
+            ExtendedWindowStyle = WS_EX_TOOLWINDOW,
+            Width = 0,
+            Height = 0,
+            PositionX = 0,
+            PositionY = 0,
+        });
         _source.AddHook(WndProc);
     }
 

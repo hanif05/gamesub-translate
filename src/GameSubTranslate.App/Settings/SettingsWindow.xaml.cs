@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using GameSubTranslate.App.Overlay;
@@ -20,6 +21,7 @@ using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using MessageBox = System.Windows.MessageBox;
 using Brushes = System.Windows.Media.Brushes;
 using Cursors = System.Windows.Input.Cursors;
+using Panel = System.Windows.Controls.Panel;
 
 namespace GameSubTranslate.App.Settings;
 
@@ -36,6 +38,10 @@ public partial class SettingsWindow : Window
     private bool _capturingHotkey;
     private string _hotkeySetting = "";
     private TextBox? _colorTarget;
+    // T61: track show/hide state for the API key field — clicking the eye icon swaps a
+    // PasswordBox for a plain TextBox carrying the same value.
+    private bool _apiKeyShown;
+    private string _apiKeyBuffer = "";
 
     /// <summary>True once the user saved. Read after Close to decide whether settings need reloading.</summary>
     public bool Saved { get; private set; }
@@ -81,6 +87,60 @@ public partial class SettingsWindow : Window
         var versionFile = Path.Combine(AppContext.BaseDirectory, "version.txt");
         var version = File.Exists(versionFile) ? File.ReadAllText(versionFile).Trim() : "-";
         AboutVersion.Text = $"Version {version}";
+
+        // T61: wire the helper hyperlinks to shell-execute the URI.
+        Hyperlink_OnRequestNavigate(OpenAiDocLink);
+        Hyperlink_OnRequestNavigate(OpenRouterDocLink);
+    }
+
+    private static void Hyperlink_OnRequestNavigate(Hyperlink link)
+    {
+        link.RequestNavigate += (_, e) =>
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+                e.Handled = true;
+            }
+            catch { /* best-effort */ }
+        };
+    }
+
+    /// <summary>T61: show/hide API key. Swaps a TextBox in front of the PasswordBox so the
+    /// value can be inspected without losing the masked rendering when re-hidden.</summary>
+    private void ToggleApiKeyVisibility_Click(object sender, RoutedEventArgs e)
+    {
+        // ponytail: single-row swap — full two-way data binding would need INotifyPropertyChanged
+        // on a wrapper VM. Hand-rolled buffer is simpler than wiring a DTO just for one field.
+        var parent = (Panel)ApiKeyBox.Parent;
+        if (!_apiKeyShown)
+        {
+            _apiKeyBuffer = ApiKeyBox.Password;
+            ApiKeyBox.Visibility = Visibility.Collapsed;
+            var box = new TextBox { Text = _apiKeyBuffer, Margin = new Thickness(0) };
+            box.SetValue(Grid.ColumnProperty, 0);
+            parent.Children.Insert(parent.Children.IndexOf(ApiKeyBox), box);
+            ApiKeyEyeIcon.Text = ""; // hide icon
+            _apiKeyShown = true;
+        }
+        else
+        {
+            // Find the temp TextBox and remove it. PasswordBox is not a TextBox, so a
+            // direct reference compare would fail — compare by reference identity instead.
+            for (int i = 0; i < parent.Children.Count; i++)
+            {
+                if (parent.Children[i] is TextBox tb && !ReferenceEquals(tb, ApiKeyBox) && Grid.GetColumn(tb) == 0)
+                {
+                    _apiKeyBuffer = tb.Text;
+                    parent.Children.RemoveAt(i);
+                    break;
+                }
+            }
+            ApiKeyBox.Password = _apiKeyBuffer;
+            ApiKeyBox.Visibility = Visibility.Visible;
+            ApiKeyEyeIcon.Text = ""; // show icon
+            _apiKeyShown = false;
+        }
     }
 
     private void LoadSettings()
@@ -242,7 +302,9 @@ public partial class SettingsWindow : Window
 
     private async void TestConnection_Click(object sender, RoutedEventArgs e)
     {
-        var key = string.IsNullOrWhiteSpace(ApiKeyBox.Password) ? _settings.ApiKey : ApiKeyBox.Password;
+        // T61: same buffer trick — if key is shown in plain text, use the buffer.
+        var apiKeyInput = _apiKeyShown ? _apiKeyBuffer : ApiKeyBox.Password;
+        var key = string.IsNullOrWhiteSpace(apiKeyInput) ? _settings.ApiKey : apiKeyInput;
         var baseUrl = string.IsNullOrWhiteSpace(BaseUrlBox.Text) ? _settings.BaseUrl : BaseUrlBox.Text.Trim();
         var model = string.IsNullOrWhiteSpace(ModelBox.Text) ? _settings.Model : ModelBox.Text.Trim();
 
@@ -358,7 +420,7 @@ public partial class SettingsWindow : Window
         _capturingHotkey = true;
         _hotkeySetting = settingName;
         HotkeyHint.Text = "Press the new keys… (ESC to cancel)";
-        HotkeyHint.Visibility = Visibility.Visible;
+        HotkeyHintBanner.Visibility = Visibility.Visible;
     }
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
@@ -373,7 +435,7 @@ public partial class SettingsWindow : Window
             if (key == Key.Escape)
             {
                 _capturingHotkey = false;
-                HotkeyHint.Visibility = Visibility.Collapsed;
+                HotkeyHintBanner.Visibility = Visibility.Collapsed;
                 return;
             }
             var mods = Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift | ModifierKeys.Windows);
@@ -383,12 +445,13 @@ public partial class SettingsWindow : Window
             {
                 AssignHotkey(_hotkeySetting, spec);
                 _capturingHotkey = false;
-                HotkeyHint.Visibility = Visibility.Collapsed;
+                HotkeyHintBanner.Visibility = Visibility.Collapsed;
             }
             else
             {
-                MessageBox.Show(this, $"Hotkey {spec} is already bound to another action.",
-                    "Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+                // T63: inline conflict message — banner stays visible briefly with the warning text.
+                HotkeyHint.Text = $"\"{spec}\" is already bound to another action — try another combo.";
+                return;
             }
             return;
         }
@@ -478,7 +541,9 @@ public partial class SettingsWindow : Window
         var s = _settings;
         s.BaseUrl = string.IsNullOrWhiteSpace(BaseUrlBox.Text) ? null : BaseUrlBox.Text.Trim();
         s.Model = string.IsNullOrWhiteSpace(ModelBox.Text) ? null : ModelBox.Text.Trim();
-        if (!string.IsNullOrEmpty(ApiKeyBox.Password)) s.ApiKey = ApiKeyBox.Password; // empty → keep existing
+        // T61: read from the show/hide buffer if visible, else the masked PasswordBox.
+        var apiKeyInput = _apiKeyShown ? _apiKeyBuffer : ApiKeyBox.Password;
+        if (!string.IsNullOrEmpty(apiKeyInput)) s.ApiKey = apiKeyInput; // empty → keep existing
         s.SourceLang = GetComboValue(SourceLangBox, "auto");
         s.TargetLang = GetComboValue(TargetLangBox, "id");
         s.CaptureIntervalMs = interval;

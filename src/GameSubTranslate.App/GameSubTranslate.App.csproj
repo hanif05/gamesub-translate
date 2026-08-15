@@ -21,6 +21,8 @@
     <Company>hanif05</Company>
     <Copyright>Personal use only</Copyright>
     <NeutralLanguage>en</NeutralLanguage>
+    <!-- T77: app icon — shows in Explorer, taskbar, and (with Window.Icon) the title bar. -->
+    <ApplicationIcon>App.ico</ApplicationIcon>
   </PropertyGroup>
 
   <!-- T44: Release config gets the optimization knobs. Debug stays default so dev loop is fast. -->
@@ -42,6 +44,11 @@
     <None Include="version.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <!-- T77: App.ico double-duty — ApplicationIcon (exe/Explorer) + Resource (pack:// for Window.Icon). -->
+  <ItemGroup>
+    <Resource Include="App.ico" />
   </ItemGroup>
 
   <!-- T43/T44: ship the OCR language data so the installer copies it into {app}\assets\tessdata.

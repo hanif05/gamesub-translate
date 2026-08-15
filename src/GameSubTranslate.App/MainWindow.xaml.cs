@@ -39,7 +39,24 @@ public partial class MainWindow : Window
         _service = new ProfileService(_repo, _settingsStore, _settings);
         _overlay = overlay;
         if (owner is not null) Owner = owner;
+        LoadVersion();
         Refresh();
+    }
+
+    private void LoadVersion()
+    {
+        // F58: version surfaced from version.txt (sits next to the .csproj). Trim + skip on
+        // missing so a fresh build with no resource doesn't show "v?".
+        try
+        {
+            var path = System.IO.Path.Combine(AppContext.BaseDirectory, "version.txt");
+            if (System.IO.File.Exists(path))
+            {
+                var v = System.IO.File.ReadAllText(path).Trim();
+                if (v.Length > 0) VersionText.Text = $"v{v}";
+            }
+        }
+        catch { /* best-effort, leave empty */ }
     }
 
     private void Refresh()
@@ -50,6 +67,11 @@ public partial class MainWindow : Window
             var profiles = _repo.GetAll().ToList();
             ProfileList.ItemsSource = profiles;
             CountText.Text = $"({profiles.Count})";
+            // F58: empty state visibility.
+            if (EmptyState is not null)
+                EmptyState.Visibility = profiles.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (EmptyHint is not null)
+                EmptyHint.Text = "click + New to add one";
 
             // Select the active profile if known.
             if (_service.ActiveProfileId is int pid)
@@ -332,6 +354,10 @@ public partial class MainWindow : Window
         StopBtn.IsEnabled = running;
         PauseBtn.IsEnabled = running;
         PauseBtn.Content = paused ? "Resume" : "Pause";
+        // F58: status pill color reflects pipeline state.
+        if (running && !paused) { StatusPill.Text = "Running"; StatusPill.Foreground = (System.Windows.Media.Brush)FindResource("Brush.Success"); }
+        else if (paused) { StatusPill.Text = "Paused"; StatusPill.Foreground = (System.Windows.Media.Brush)FindResource("Brush.Warn"); }
+        else { StatusPill.Text = "Idle"; StatusPill.Foreground = (System.Windows.Media.Brush)FindResource("Brush.Text.Muted"); }
     }
 
     private void SetStatus(string msg) => StatusText.Text = msg;

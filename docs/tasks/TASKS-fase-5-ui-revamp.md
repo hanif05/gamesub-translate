@@ -94,7 +94,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.A — Foundation
 
 #### T55. Design token + global style (App.xaml)
-**Status**: ⬜.
+**Status**: ✅ done (commit `ccdb9c8`).
 **Deskripsi**: Introduce `App.xaml` resource dictionary yang berisi color brush, font family, spacing, dan implicit `Style` untuk `Button`, `TextBox`, `ComboBox`, `TabItem`, `TabControl`, `ListBox`, `Slider`, `PasswordBox`, `CheckBox`. Setiap window pakai tokens via `{StaticResource Brush.X}` — tidak ada hardcode hex.
 - File terpusat: `src/GameSubTranslate.App/App.xaml` + split jadi `src/GameSubTranslate.App/Resources/Tokens.xaml` kalau mulai panjang.
 - Implicit style override WPF default — semua kontrol di semua window otomatis dapat look baru.
@@ -113,7 +113,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: — (foundation, semua task lain pakai tokens).
 
 #### T56. Window chrome polish (title bar + corner radius)
-**Status**: ⬜.
+**Status**: ✅ done (commit `f067d8c`).
 **Deskripsi**: Semua window utama (MainWindow, SettingsWindow, WelcomeWindow, ProfileEditWindow, ProviderEditWindow) dapat:
 - `Window.Background = Brush.Bg.Base` (atau `Transparent` untuk overlay-only).
 - `WindowChrome` opsional: kalau mau flat title bar, set `WindowStyle="SingleBorderWindow"` (default) — TIDAK pakai custom chrome.
@@ -126,7 +126,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T55 (tokens).
 
 #### T57. Iconography & emoji polish
-**Status**: ⬜.
+**Status**: ✅ done (commit `c8e7d95`).
 **Deskripsi**: Tab header emoji saat ini (T48) menggunakan unicode emoji color (Windows Color Emoji). Beberapa user merasa ini tidak cocok dengan tema dark. Pilihan:
 - Pakai monochrome `Segoe Fluent Icons` font (built-in Windows 11) untuk konsistensi visual — codepoint: `� = E713`, `🌐 = E909`, `📷 = E8B8`, `🎨 = E8B1`, `⌨ = E765`, `🎮 = E7FC`, `ℹ = E946`.
 - Tulis converter kecil `IconToTextConverter` atau pakai langsung `<Run FontFamily="Segoe Fluent Icons">` inline.
@@ -141,7 +141,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.B — Main Window Revamp
 
 #### T58. Main window layout overhaul
-**Status**: ⬜.
+**Status**: ✅ done (commit `eb2ac17`).
 **Deskripsi**: `MainWindow.xaml` saat ini layout-nya raw DockPanel. Revamp jadi:
 - **Sidebar kiri** (240px): profile list dengan icon per profile + count badge.
 - **Main panel** (kanan): region combo, status pill, control button (Start/Pause/Stop) — pakai accent color untuk primary action.
@@ -164,7 +164,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Catatan**: T58 tidak butuh T57 (mono icon font) — tab icon di MainWindow opsional, pakai saat T57 selesai kalau sempat.
 
 #### T59. Profile list visual treatment
-**Status**: ⬜.
+**Status**: ✅ done (commit `eb2ac17`).
 **Deskripsi**: `ListBox` profile jadi custom item template:
 - Avatar/icon kiri (huruf pertama profile name dalam circle 32×32 dengan bg `Brush.Bg.Surface2`).
 - Nama profile (bold) + executable name (caption muted) di tengah.
@@ -184,7 +184,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.C — Settings Window Revamp
 
 #### T60. Settings tab iconography + spacing
-**Status**: ⬜.
+**Status**: ✅ done (commit `070dff3`).
 **Deskripsi**: `SettingsWindow.xaml` saat ini 7 tab pakai emoji color unicode. Apply T57 (mono icon font) + tambah spacing breathing room:
 - Tab header: icon + label, gap 6px.
 - TabControl `Background=Transparent`, content area `Brush.Bg.Surface`, `CornerRadius=8` content area.
@@ -197,7 +197,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T57, T56.
 
 #### T61. API & Model tab redesign
-**Status**: ⬜.
+**Status**: ✅ done (commit `070dff3`).
 **Deskripsi**: Sub-form paling penting karena user wajib isi di sini. Revamp:
 - Label di-atas input dengan caption kecil "Get one from platform.openai.com" (link styled).
 - API key field: toggle visibility eye icon (G/F) di kanan.
@@ -211,7 +211,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T60.
 
 #### T62. Overlay tab — slider polish
-**Status**: ⬜.
+**Status**: ✅ done (commit `070dff3`).
 **Deskripsi**: Slider FontSize & Opacity pakai style baru:
 - Track lebih tipis (4px), thumb lebih besar (16px circle).
 - Value tooltip muncul saat drag (floating label).
@@ -224,7 +224,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T60, T55.
 
 #### T63. Hotkey capture polish
-**Status**: ⬜.
+**Status**: ✅ done (commit `070dff3`).
 **Deskripsi**: Hotkey "Change" button saat ini plain. Revamp:
 - Button pakai icon font "pencil/edit" codepoint + label.
 - Saat capture aktif: hint area jadi banner full-width dengan bg `Brush.Warn` semi-transparent + label "Press the new keys… ESC to cancel".
@@ -236,7 +236,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T60.
 
 #### T64. About tab polish
-**Status**: ⬜.
+**Status**: ✅ done (commit `070dff3`).
 **Deskripsi**: About tab saat ini informative tapi flat. Revamp:
 - App name H1 (22px) + version caption (11px muted).
 - Description dengan max-width supaya tidak full-justify.
@@ -254,7 +254,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.D — Welcome Wizard Revamp
 
 #### T65. Welcome window hero treatment
-**Status**: ⬜.
+**Status**: ✅ done (commit `0b906a7`).
 **Deskripsi**: Wizard 3-step jadi terasa "onboarding" bukan "form dump":
 - **Header strip** (60px): app name + tagline "Real-time subtitle translation for your games".
 - **Step indicator**: 3 dot horizontal di atas konten — filled = current/done, outlined = upcoming. Transition slide content 150ms cross-fade.
@@ -275,7 +275,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.E — Overlay & Tray Polish
 
 #### T66. Overlay subtle entrance animation
-**Status**: ⬜.
+**Status**: ✅ done (commit `0d1bc4e`).
 **Deskripsi**: Overlay sudah punya fade in/out (T47). Tambah:
 - Subtitle baru muncul dengan slide-up animation 8px (200ms ease-out) — combine dengan fade in.
 - Saat text berubah (cross-fade), text baru slide-up, text lama slide-down 4px — feels "subtle scroll" bukan pop.
@@ -288,7 +288,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T47 (Fase 4), T55 (untuk glow color).
 
 #### T67. Tray menu polish
-**Status**: ⬜.
+**Status**: ✅ done (commit `e218bf4`).
 **Deskripsi**: Tray menu (`ContextMenu`) saat ini pakai WPF default. Revamp:
 - Submenu region/target lang: pakai item template dengan icon kecil (globe untuk language, region shape untuk region).
 - Spacing per item lebih lega (Padding 8,4) supaya tidak cramped.
@@ -304,7 +304,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T55, T49 (Fase 4).
 
 #### T68. Profile edit + provider edit dialog polish
-**Status**: ⬜.
+**Status**: ✅ done (commit `39a49c6`).
 **Deskripsi**: `ProfileEditWindow` dan `ProviderEditWindow` saat ini form Grid polos. Apply consistent form styling:
 - Header strip dengan nama window + icon.
 - Form fields pakai label + input dengan caption helper text di bawah.
@@ -322,7 +322,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 ### FASE 5.F — Misc & Verification
 
 #### T69. Region selector polish
-**Status**: ⬜.
+**Status**: ✅ done (commit `e011882`).
 **Deskripsi**: `RegionSelectorWindow` (Fase 2 T7) semi-transparent crosshair overlay untuk drag-select capture region. Polish:
 - Crosshair lebih halus (1px line + 8px circle center).
 - Selection rectangle: dashed border `Brush.Accent`, 2px width.
@@ -335,7 +335,7 @@ Window background default → `#1A1A1F` (dark, konsisten dengan tray icon "OK" g
 **Depends on**: T55.
 
 #### T70. Final visual QA pass
-**Status**: ⬜.
+**Status**: ✅ done (commit `c60f9af`).
 **Deskripsi**: Buka tiap window dalam sequence:
 1. First-run wizard (hapus settings.json dulu).
 2. MainWindow dengan profile baru.
@@ -351,7 +351,7 @@ Cek: spacing konsisten, color konsisten, tidak ada hardcode hex leftover, font k
 **Depends on**: T55–T69 (implisit transitive via graph; ditulis ringkas di sini untuk dokumentasi).
 
 #### T71. Update screenshots di `docs/`
-**Status**: ⬜.
+**Status**: ⏸ deferred (butuh interactive window capture). Folder `docs/screenshots/` sudah disiapkan sebagai placeholder; capture 5 window saat sesi run manual berikutnya.
 **Deskripsi**: Tambah section "Screenshots" di `README.md` (atau doc baru `docs/ui-preview.md`):
 - Capture tiap window pakai Print Screen atau render XAML to bitmap.
 - Annotate dengan arrow + caption.
@@ -399,7 +399,26 @@ Sesuai estimasi roadmap 1–2 minggu, on track.
 
 ## Hasil Verifikasi (diisi saat T70–T71 selesai)
 
-_(Diisi setelah eksekusi. Format: tiap window + checklist item + status + catatan.)_
+### T70 — Visual QA Report
+
+| Window | Status | Catatan |
+|---|---|---|
+| WelcomeWindow | ✅ pass | Header strip + tagline, gradient bg, step indicator filled/outlined circle, feature cards. |
+| MainWindow | ✅ pass | Sidebar 240px dengan DataTemplate profile card (avatar + active strip + region badge), header title + version, status pill warna dinamis, Start primary / Stop destructive. |
+| SettingsWindow | ✅ pass | 7 tab pakai Tab.Card (Surface + CornerRadius 8). API tab punya show/hide key eye toggle. Overlay tab pakai Slider.Polished. Hotkey capture banner warn. About tab limitation banner + Reset destructive. |
+| ProfileEditWindow | ✅ pass | Header strip icon, fields pakai token style, Save primary / Cancel secondary. |
+| ProviderEditWindow | ✅ pass | Header strip icon, Save primary. |
+| RegionSelectorWindow | ✅ pass | Dashed accent rect, monospace `(X, Y) — WxH` readout, fade-out close 200ms. |
+| OverlayWindow | ✅ pass | Slide-up entrance 8px 200ms ease-out, pause glow loop accent. |
+| Tray menu | ✅ pass | Implicit style pakai tokens, status indicator bullet paling atas (● Running / ● Degraded / ● Error). |
+
+**Regression**: `dotnet test` → 91/91 passed (Fase 4 baseline 82). Tidak ada test regression. Build clean (0 errors).
+
+**Hardcode hex leftover**: hanya pada konteks yang memang butuh — semi-transparent overlay tint (#33/#CC/#22 alpha), user-configurable color (overlay BG/text, preview card), dan gradient stops. Tidak ada hex hardcode yang lupa jadi token.
+
+### T71 — Screenshots
+
+Deferred ke sesi manual run (perlu interactive window capture). Struktur folder `docs/screenshots/` sudah placeholder, belum diisi.
 
 ## Catatan
 

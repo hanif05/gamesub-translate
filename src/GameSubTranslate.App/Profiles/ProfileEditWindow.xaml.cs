@@ -22,6 +22,7 @@ public partial class ProfileEditWindow : Window
         InitializeComponent();
         _existing = existing;
         Title = existing is null ? "New Profile" : $"Edit Profile - {existing.Name}";
+        HeaderTitle.Text = existing is null ? "New Profile" : $"Edit — {existing.Name}";
 
         _regions = existing?.Regions.ToList() ?? new List<CaptureRegion>();
         RefreshRegionsList();
