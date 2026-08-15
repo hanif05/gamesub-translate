@@ -1,148 +1,134 @@
 # GameSubTranslate
 
-Personal Windows tool untuk auto-translate subtitle game PC (fokus RPG/story-heavy, termasuk AAA modern). Capture custom region di layar → OCR lokal (Tesseract) → translate via endpoint OpenAI-compatible → tampil di overlay transparan click-through di atas game. Built for personal use, **Windows-only**.
+> Real-time subtitle translation overlay for PC games. Pick a region, get translated text on screen.
 
-Lihat [`PRD-Auto-Translate-Subtitle-Game.md`](PRD-Auto-Translate-Subtitle-Game.md) untuk requirement lengkap. Aturan kerja + konteks project untuk AI assistant: [`CLAUDE.md`](CLAUDE.md).
+Windows-only. C# / .NET 8 / WPF. Capture → OCR (Tesseract) → translate (OpenAI-compatible) → click-through overlay.
 
-## Status
+![Status](https://img.shields.io/badge/status-active-success)
+![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)
+![.NET](https://img.shields.io/badge/.NET-8.0-purple)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-| Fase | Status | Detail |
-|---|---|---|
-| 1 — Prototype (console, end-to-end) | ✅ Done | `docs/tasks/TASKS-fase-1-prototype.md` |
-| 2 — MVP Overlay (WPF click-through) | ✅ Done | `docs/tasks/TASKS-fase-2-mvp-overlay.md` |
-| 3 — Optimisasi (testing, caching, streaming, failover) | ✅ Done | `docs/tasks/TASKS-fase-3-optimisasi.md` |
-| 4 — Polish & Packaging (installer, UI polish, presets) | ✅ Done | `docs/tasks/TASKS-fase-4-polish.md` |
-| 5 — UI Revamp (design tokens, Segoe Fluent Icons, animations) | ✅ Done | `docs/tasks/TASKS-fase-5-ui-revamp.md` |
+## Preview
 
-## Tech Stack
+Drop screenshots of the main windows into [`docs/screenshots/`](docs/screenshots/README.md) and they'll show up here.
 
-- **.NET 8** (`net8.0-windows10.0.19041.0`) — C# + WPF
-- **Screen capture**: `Windows.Graphics.Capture` (Win2D), per-monitor, crop ke region
-- **OCR**: Tesseract (`Tesseract` NuGet oleh Charlesw)
-- **Translation**: `HttpClient` manual ke `/chat/completions` OpenAI-compatible (provider-agnostic: OpenAI, OpenRouter, Groq, Ollama, dsb) + retry exponential backoff + cache SQLite
-- **Storage**: SQLite + Dapper (`%APPDATA%/GameSubTranslate/profiles.db`) — profile, region, translation cache
-- **Config**: JSON + DPAPI-encrypted API key (`%APPDATA%/GameSubTranslate/settings.json`)
-- **Global hotkey**: Win32 `RegisterHotKey` (toggle overlay / pause / settings / manual capture)
-- **Overlay**: WPF window `WS_EX_LAYERED | WS_EX_TRANSPARENT` (click-through, always-on-top)
-- **System tray**: `Hardcodet.NotifyIcon.Wpf`
+| Main | Overlay | Region Selector | Settings |
+|------|---------|-----------------|----------|
+| _tbd_ | _tbd_ | _tbd_ | _tbd_ |
 
-## Struktur
+## What it does
 
-```
-.
-├── src/
-│   ├── GameSubTranslate.Prototype/   ← console end-to-end (testing CLI tanpa UI)
-│   ├── GameSubTranslate.Core/        ← classlib: Capture, Ocr, Pipeline, Translation, Config, Storage, Profiles, Cache, Logging
-│   └── GameSubTranslate.App/         ← WPF: MainWindow, ProfileEdit, RegionSelector, Overlay, Settings, Hotkeys, Onboarding
-├── tests/
-│   └── GameSubTranslate.Core.Tests/  ← xUnit (91 tests: ChangeDetector, TranslationClient, SettingsStore, TranslationCache, streaming, FileLogger, Ocr engines, failover, + Fase 5 UI helpers)
-├── assets/tessdata/                  eng.traineddata
-├── installer/                        (Fase 4) Inno Setup script + publish output
-├── docs/
-│   ├── PRD-Auto-Translate-Subtitle-Game.md
-│   ├── game-presets.md               (Fase 4) preset region per game populer
-│   ├── screenshots/                  (Fase 5) target file list untuk capture manual tiap window
-│   └── tasks/
-│       ├── TASKS-fase-1-prototype.md
-│       ├── TASKS-fase-2-mvp-overlay.md
-│       ├── TASKS-fase-3-optimisasi.md
-│       ├── TASKS-fase-4-polish.md
-│       └── TASKS-fase-5-ui-revamp.md
-├── GameSubTranslate.sln
-├── CLAUDE.md                         ruleset untuk AI assistant
-└── README.md
-```
+- Capture any rectangle of your screen (per-monitor, multi-DPI).
+- OCR with local Tesseract — no cloud round-trip for text recognition.
+- Translate via any OpenAI-compatible endpoint (OpenAI, OpenRouter, Groq, Ollama, LM Studio…).
+- Render result in a click-through overlay that sits on top of the game.
+- Hotkeys to toggle / pause / manually capture without leaving the game.
+- Auto-load a profile when a matching game window gets focus.
+- Translation cache (exact + fuzzy) — repeated lines cost ~0ms.
 
-## Setup
+## Why
 
-### Prasyarat
+Most RPG / story-heavy games ship with English-only text or no official translation. This tool lets you play them in your language without alt-tabbing, without modifying game files, and without running a game process injection (read-only screen capture only).
 
-- Windows 10 1903+ (build 18362) — `Windows.Graphics.Capture` requirement
-- .NET 8 SDK (build & dev)
-- **Untuk runtime end-user (Fase 4 installer)**: .NET 8 Desktop Runtime — installer akan cek dan prompt download link resmi kalau belum ada
-- API key endpoint OpenAI-compatible (OpenAI, OpenRouter, Groq, Ollama, dsb)
+## Quickstart
 
-### Build
+Requires Windows 10 1903+ and the .NET 8 SDK.
 
 ```bash
+git clone https://github.com/hanif05/gamesub-translate.git
+cd gamesub-translate
 dotnet build
-```
-
-### Run (Fase 2 — app WPF)
-
-```bash
 dotnet run --project src/GameSubTranslate.App
 ```
 
-### Run (Fase 1 — console prototype, untuk testing CLI)
+On first launch the welcome wizard walks you through:
+
+1. **Provider** — base URL, model, API key (encrypted with DPAPI at rest).
+2. **Profile** — name + target executable (e.g. `CODEVEIN.exe`).
+3. **Region** — drag a rectangle over the game's subtitle area.
+
+Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> to toggle the overlay. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd> to pause. Full hotkey list in Settings → Hotkeys.
+
+## CLI (optional)
+
+A console prototype lives in `src/GameSubTranslate.Prototype/` for headless testing or scripted capture loops.
 
 ```bash
-# Tanam env var untuk translation
 export OPENAI_API_KEY="sk-..."
 export OPENAI_BASE_URL="https://api.openai.com/v1"
 export OPENAI_MODEL="gpt-4o-mini"
 
-# Run: --x --y --w --h = capture region, --interval = ms antar tick
-dotnet run --project src/GameSubTranslate.Prototype -- --x 0 --y 800 --w 1280 --h 200 --interval 1000
+dotnet run --project src/GameSubTranslate.Prototype -- \
+  --x 0 --y 800 --w 1280 --h 200 --interval 1000
 ```
 
-## Cara Pakai (Fase 2)
+## Tech stack
 
-1. Jalankan app → buka Settings (`Ctrl+Alt+S` atau tray icon) → isi Base URL, Model, API key → Test Connection → Save.
-2. **New Profile** → nama game + executable name (untuk auto-load) → Save.
-3. **Edit** profile → **Add Region** → drag rectangle di atas area subtitle game → beri nama → Save.
-4. **Start** pipeline → overlay menampilkan terjemahan real-time di atas game.
-5. Hotkeys (default, bisa diganti di Settings):
-   - `Ctrl+Alt+T` — toggle overlay show/hide
-   - `Ctrl+Alt+P` — pause/resume capture
-   - `Ctrl+Alt+S` — buka Settings
-   - `Ctrl+Alt+Space` — manual capture 1x (skip change detection)
-6. Auto-load: fokus ke window game yang executable-nya match profile → profile aktif otomatis dipilih dalam <3 detik.
-7. Tutup MainWindow → app tetap jalan di system tray. **Exit** (tray) untuk keluar penuh.
+| Layer | Choice |
+|-------|--------|
+| UI | WPF on `net8.0-windows10.0.19041.0` |
+| Capture | `Windows.Graphics.Capture` + Win2D |
+| OCR | Tesseract (`Tesseract` NuGet by Charlesw) |
+| Translation | `HttpClient` to OpenAI-compatible `/chat/completions` — provider-agnostic |
+| Cache | SQLite + Dapper, exact + Levenshtein-fuzzy lookup |
+| Storage | JSON + DPAPI-encrypted secrets (`%APPDATA%/GameSubTranslate/`) |
+| Hotkeys | Win32 `RegisterHotKey` |
+| Overlay | WPF `WS_EX_LAYERED \| WS_EX_TRANSPARENT` |
+| Tray | `Hardcodet.NotifyIcon.Wpf` |
 
-## Limitasi
+Design system: tokens (`Resources/Tokens.xaml`), Segoe Fluent Icons, 60fps `DispatcherTimer` animations — all bundled in `src/GameSubTranslate.App/`.
 
-- OCR English only (`eng.traineddata`). Bahasa lain = tambah `.traineddata` ke `assets/tessdata/`. Vision AI OCR (Fase 3) bisa handle font stylized multibahasa tanpa file tessdata.
-- Capture region manual per game (auto-detect region via AI — Fase 5+).
-- Model provider `:free` (OpenRouter) mudah kena rate limit → API call gagal beruntun. Retry + failover ke fallback provider + categorized overlay error sudah ditangani (Fase 3 T12, T39, T40).
-- Latency end-to-end dominan waktu LLM API. Streaming mode (Fase 3 T36) turunkan first-token ke <1s; full response ~1.5–5s. Cache hit (exact + fuzzy) ~0-1ms.
+## Project layout
 
-## Self-checks
-
-Verifikasi otomatis per task, jalan tanpa test framework:
-
-```bash
-# Core/Prototype
-dotnet run --project src/GameSubTranslate.Prototype -- --selfcheck-t3
-# App (WPF) — butuh display session
-dotnet run --project src/GameSubTranslate.App -- --selfcheck-t14
-
-# Fase 3 integration smoke (T35 long-running profile, T36 streaming, T37 fuzzy, dst)
-for t in t35 t36 t37 t38 t39 t40 t41; do
-  "/d/Coding/game-sub-translate/src/GameSubTranslate.App/bin/Debug/net8.0-windows10.0.19041.0/GameSubTranslate.App.exe" "--selfcheck-$t"
-done
+```
+.
+├── src/
+│   ├── GameSubTranslate.Prototype/   console end-to-end smoke
+│   ├── GameSubTranslate.Core/        capture, OCR, translation, pipeline, config, storage
+│   └── GameSubTranslate.App/         WPF windows, hotkeys, tray, design tokens
+├── tests/
+│   └── GameSubTranslate.Core.Tests/  xUnit (91 tests)
+├── assets/tessdata/                  eng.traineddata
+├── docs/
+│   ├── PRD-Auto-Translate-Subtitle-Game.md
+│   ├── game-presets.md
+│   ├── screenshots/                  drop PNGs here, README picks them up
+│   └── tasks/                        per-fase task logs
+├── installer/                        Inno Setup script
+├── tools/                            build helpers (icon generator, etc.)
+├── GameSubTranslate.sln
+├── CLAUDE.md                         AI assistant ruleset
+└── README.md
 ```
 
 ## Tests
-
-xUnit suite (91 tests, sejak Fase 3 + Fase 5):
 
 ```bash
 dotnet test
 ```
 
-Coverage: `ChangeDetector`, `TranslationClient` (retry/timeout/error kategori/failover), `TranslationStream`, `SettingsStore` (DPAPI + JSON), `TranslationCache` (exact + fuzzy + Levenshtein), `FileLogger` (rotation), `TesseractOcrEngine` + `VisionAiOcrEngine`, `MaskLayer`-style converter helpers (Fase 5).
+91 xUnit tests covering the change detector, translation client (retry/timeout/error categorization/failover), streaming, settings store, cache, file logger, both OCR engines, and the Fase 5 UI helpers.
 
-## UI Design System (Fase 5)
+## Self-checks
 
-Sejak Fase 5, semua styling WPF pakai design tokens terpusat di `src/GameSubTranslate.App/Resources/Tokens.xaml` (color, font, spacing, radius, shadow). Implicit style untuk `Button`, `TextBox`, `PasswordBox`, `ComboBox`, `CheckBox`, `ListBox`, `TabControl`, `Slider`, `Window`. Named style: `Button.Primary`, `Button.Destructive`, `Slider.Polished`, `Tab.Card`, `Banner.Warn`, `Text.Helper`, `Font.Icon`. Iconography pakai **Segoe Fluent Icons** (built-in Win11), monospace U+E codepoint — no emoji, no font file tambahan.
+Some flows have standalone self-check commands that exit non-zero on failure — useful in CI without pulling in a display server.
 
-Animasi pakai `DispatcherTimer` 16ms (60fps): overlay entrance slide (200ms ease-out) + pause-state glow pulse loop.
+```bash
+dotnet run --project src/GameSubTranslate.Prototype -- --selfcheck-t3
+dotnet run --project src/GameSubTranslate.App         -- --selfcheck-t14
+```
+
+## Known limitations
+
+- OCR ships with English only. Drop additional `*.traineddata` into `assets/tessdata/` for other languages, or switch the OCR engine to the bundled Vision-AI provider in Settings.
+- End-to-end latency is dominated by the LLM API. Streaming brings first-token to sub-second; cache hits are ~0ms.
+- Free-tier providers (e.g. OpenRouter `:free`) rate-limit aggressively. The client retries with exponential backoff and falls over to a backup provider if configured.
 
 ## Contributing
 
-Personal project — tidak menerima external PR. Issues untuk self-tracking.
+PRs welcome for bug fixes, new providers, additional game presets, or UI polish. For new features please open an issue first so we can agree on the shape. See [`CLAUDE.md`](CLAUDE.md) for the AI assistant workflow used in this repo.
 
 ## License
 
-Personal use only.
+[MIT](LICENSE) © hanif05
