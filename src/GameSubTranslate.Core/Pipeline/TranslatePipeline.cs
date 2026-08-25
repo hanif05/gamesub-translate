@@ -227,7 +227,9 @@ public sealed class TranslatePipeline : IDisposable
                             _lastPng = png;
                             _lastChangeAt = DateTime.UtcNow;
                             _unchangedCount = 0;
+                            var ocrSw = Stopwatch.StartNew();
                             string text = await _ocr.RecognizeAsync(png, ct);
+                            ocrSw.Stop();
                             // Fix 2: compare the *normalized* text so frame-to-frame OCR noise on
                             // the same dialog line collapses to one key — one translation, not 3.
                             // Fix 4: garbage-only frames normalize to "" and are dropped.
@@ -235,7 +237,7 @@ public sealed class TranslatePipeline : IDisposable
                             if (norm.Length > 0 && norm != _lastText)
                             {
                                 _lastText = norm;
-                                _logger?.Info("OCR", $"recognize text=\"{Truncate(norm, 120)}\"");
+                                _logger?.Info("OCR", $"recognize {ocrSw.Elapsed.TotalMilliseconds:F0}ms text=\"{Truncate(norm, 120)}\"");
                                 await TranslateAndShowAsync(text, ct);
                             }
                             else if (norm.Length > 0)
