@@ -10,6 +10,10 @@ public sealed class AppConfig
     public string SourceLang { get; init; } = "auto";
     public string TargetLang { get; init; } = "id";
 
+    /// <summary>F82: propagated from AppSettings.PaddleUseGpu. Default false — CPU mkldnn path
+    /// works on any x64 host; user opts in when they have CUDA hardware.</summary>
+    public bool PaddleUseGpu { get; init; } = false;
+
     /// <summary>T40: fallback providers (from AppSettings.Providers). Empty → single-provider behavior.</summary>
     public List<ProviderConfig> Providers { get; init; } = new();
 

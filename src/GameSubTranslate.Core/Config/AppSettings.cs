@@ -4,6 +4,9 @@ public enum OcrEngineKind
 {
     Tesseract,
     VisionAi,
+    /// <summary>F82: PaddleOCR on-device engine. Tied to PaddleOCRSharp NuGet + bundled
+    /// PP-OCRv5 model. CPU (mkldnn) is the default; flip AppSettings.PaddleUseGpu for CUDA.</summary>
+    PaddleOcr,
 }
 
 /// <summary>T40: one translation provider endpoint. Users can add a fallback so a dead primary
@@ -40,6 +43,10 @@ public sealed class AppSettings
     public int IdleActivationWindowMs { get; set; } = 5000;
 
     public OcrEngineKind OcrEngine { get; set; } = OcrEngineKind.Tesseract;
+    /// <summary>F82: PaddleOcrEngine GPU toggle. Off by default — laptop/desktop autodetect
+    /// deferred; user flips this manually when they know the runtime is CUDA-capable.
+    /// CUDA-agnostic hosts (AMD-only systems) leave this off and rely on mkldnn CPU path.</summary>
+    public bool PaddleUseGpu { get; set; } = false;
     public string OverlayFontFamily { get; set; } = "Segoe UI";
     public double OverlayFontSize { get; set; } = 20;
     public string OverlayTextColor { get; set; } = "#FFFFFF";

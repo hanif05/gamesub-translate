@@ -301,6 +301,8 @@ public partial class MainWindow : Window
             SourceLang = _settings.SourceLang,
             TargetLang = _settings.TargetLang,
             Providers = _settings.Providers,
+            // F82: propagate Paddle GPU toggle so the factory wires PaddleOcrEngine correctly.
+            PaddleUseGpu = _settings.PaddleUseGpu,
         };
         if (!cfg.TranslationEnabled) { SetStatus("Translation not configured — set API key in Settings."); return null; }
 
