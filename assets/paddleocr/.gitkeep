@@ -1,0 +1,1 @@
+PaddleOCR model is bundled by the PaddleOCRSharp NuGet package and copied at build time via its MSBuild targets to <output>/inference/.
