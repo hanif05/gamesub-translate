@@ -15,4 +15,9 @@
     <ProjectReference Include="..\GameSubTranslate.Core\GameSubTranslate.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Paddle.Runtime.win_x64" Version="3.3.0.1" />
+    <PackageReference Include="PaddleOCRSharp" Version="6.2.0" />
+  </ItemGroup>
+
 </Project>

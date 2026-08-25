@@ -34,6 +34,7 @@ internal static class SelfChecks
         "--selfcheck-t16" => SelfCheckT16(),
         "--selfcheck-t17" => SelfCheckT17(),
         "--selfcheck-t26" => SelfCheckT26(),
+        "--selfcheck-t80" => PaddleOcrSpike.Run(),
         _ => SelfCheckT3(),
     };
 
