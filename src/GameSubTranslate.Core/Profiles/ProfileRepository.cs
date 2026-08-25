@@ -46,8 +46,8 @@ public sealed class ProfileRepository
         {
             p.CreatedAt = DateTime.UtcNow;
             p.Id = conn.ExecuteScalar<int>(@"
-                INSERT INTO GameProfile (Name, ExecutableName, SourceLang, TargetLang, OcrEngine, CaptureIntervalMs, CreatedAt)
-                VALUES (@Name, @ExecutableName, @SourceLang, @TargetLang, @OcrEngine, @CaptureIntervalMs, @CreatedAt);
+                INSERT INTO GameProfile (Name, ExecutableName, SourceLang, TargetLang, OcrEngine, PaddleUseGpu, CaptureIntervalMs, CreatedAt)
+                VALUES (@Name, @ExecutableName, @SourceLang, @TargetLang, @OcrEngine, @PaddleUseGpu, @CaptureIntervalMs, @CreatedAt);
                 SELECT last_insert_rowid();", p, tx);
 
             foreach (var r in p.Regions)
@@ -77,7 +77,8 @@ public sealed class ProfileRepository
         {
             conn.Execute(@"
                 UPDATE GameProfile SET Name=@Name, ExecutableName=@ExecutableName, SourceLang=@SourceLang,
-                    TargetLang=@TargetLang, OcrEngine=@OcrEngine, CaptureIntervalMs=@CaptureIntervalMs
+                    TargetLang=@TargetLang, OcrEngine=@OcrEngine, PaddleUseGpu=@PaddleUseGpu,
+                    CaptureIntervalMs=@CaptureIntervalMs
                 WHERE Id=@Id", p, tx);
 
             // Regions: delete-then-reinsert keeps the model authoritative and avoids diff logic.
@@ -146,6 +147,7 @@ public sealed class ProfileRepository
         public string SourceLang { get; set; } = "auto";
         public string TargetLang { get; set; } = "id";
         public OcrEngineKind OcrEngine { get; set; }
+        public bool PaddleUseGpu { get; set; }
         public int CaptureIntervalMs { get; set; }
         public string CreatedAt { get; set; } = "";
 
@@ -157,6 +159,7 @@ public sealed class ProfileRepository
             SourceLang = SourceLang,
             TargetLang = TargetLang,
             OcrEngine = OcrEngine,
+            PaddleUseGpu = PaddleUseGpu,
             CaptureIntervalMs = CaptureIntervalMs,
             CreatedAt = DateTime.TryParse(CreatedAt, out var dt) ? dt : DateTime.UtcNow,
         };
@@ -164,14 +167,17 @@ public sealed class ProfileRepository
 
     // T53 JSON surface. Stable, versioned by hand so the preset docs can refer to the schema.
     // Format deliberately mirrors the DB column names minus Id/CreatedAt (assigned at insert).
+    // F87: SchemaVersion bumped 1→2 — PaddleUseGpu field added; old presets parse fine because
+    // the field is optional in the JSON deserializer and falls back to false.
     private sealed class ProfileDto
     {
-        public int SchemaVersion { get; set; } = 1;
+        public int SchemaVersion { get; set; } = 2;
         public string Name { get; set; } = "";
         public string? ExecutableName { get; set; }
         public string SourceLang { get; set; } = "auto";
         public string TargetLang { get; set; } = "id";
         public string OcrEngine { get; set; } = "Tesseract";
+        public bool PaddleUseGpu { get; set; }
         public int CaptureIntervalMs { get; set; } = 800;
         public List<RegionDto> Regions { get; set; } = new();
 
@@ -182,6 +188,7 @@ public sealed class ProfileRepository
             SourceLang = p.SourceLang,
             TargetLang = p.TargetLang,
             OcrEngine = p.OcrEngine.ToString(),
+            PaddleUseGpu = p.PaddleUseGpu,
             CaptureIntervalMs = p.CaptureIntervalMs,
             Regions = p.Regions.Select(RegionDto.FromModel).ToList(),
         };
@@ -193,6 +200,7 @@ public sealed class ProfileRepository
             SourceLang = SourceLang,
             TargetLang = TargetLang,
             OcrEngine = Enum.TryParse<OcrEngineKind>(OcrEngine, out var k) ? k : OcrEngineKind.Tesseract,
+            PaddleUseGpu = PaddleUseGpu,
             CaptureIntervalMs = CaptureIntervalMs,
             Regions = Regions.Select(r => r.ToModel()).ToList(),
         };
