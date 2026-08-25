@@ -58,6 +58,9 @@ public partial class SettingsWindow : Window
     public SettingsWindow(OverlayWindow? overlay = null)
     {
         InitializeComponent();
+        // F82: toggle Paddle GPU checkbox visibility as the OCR engine changes. Tesseract
+        // and Vision AI have no GPU knob, so the checkbox stays hidden for those.
+        OcrEngineBox.SelectionChanged += (_, _) => UpdatePaddleGpuVisibilityFromCombo();
         _overlay = overlay;
         _settings = new SettingsStore().Load();
         _db = new Database();
@@ -152,6 +155,8 @@ public partial class SettingsWindow : Window
         SelectCombo(TargetLangBox, _settings.TargetLang);
         IntervalBox.Text = _settings.CaptureIntervalMs.ToString();
         SelectOcrEngine(_settings.OcrEngine);
+        PaddleUseGpuBox.IsChecked = _settings.PaddleUseGpu;
+        UpdatePaddleGpuVisibility(_settings.OcrEngine);
         FontFamilyBox.Text = _settings.OverlayFontFamily;
         FontSizeSlider.Value = _settings.OverlayFontSize;
         TextColorBox.Text = _settings.OverlayTextColor;
@@ -553,6 +558,7 @@ public partial class SettingsWindow : Window
         if (OcrEngineBox.SelectedItem is ComboBoxItem cbi && cbi.Tag is string tag)
             Enum.TryParse(tag, out ocr);
         s.OcrEngine = ocr;
+        s.PaddleUseGpu = PaddleUseGpuBox.IsChecked == true;
         s.OverlayFontFamily = string.IsNullOrWhiteSpace(FontFamilyBox.Text) ? "Segoe UI" : FontFamilyBox.Text.Trim();
         s.OverlayFontSize = FontSizeSlider.Value;
         s.OverlayTextColor = string.IsNullOrWhiteSpace(TextColorBox.Text) ? "#FFFFFF" : TextColorBox.Text.Trim();
@@ -599,6 +605,23 @@ public partial class SettingsWindow : Window
                 OcrEngineBox.SelectedIndex = i;
                 return;
             }
+        }
+    }
+
+    // F82: surface the Paddle GPU checkbox only when Paddle OCR is selected. Tesseract
+    // and Vision AI have no GPU toggle, so the control stays out of the way.
+    private void UpdatePaddleGpuVisibility(OcrEngineKind kind)
+    {
+        PaddleUseGpuBox.Visibility = kind == OcrEngineKind.PaddleOcr
+            ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void UpdatePaddleGpuVisibilityFromCombo()
+    {
+        if (OcrEngineBox.SelectedItem is ComboBoxItem cbi && cbi.Tag is string tag
+            && Enum.TryParse<OcrEngineKind>(tag, out var kind))
+        {
+            UpdatePaddleGpuVisibility(kind);
         }
     }
 }
