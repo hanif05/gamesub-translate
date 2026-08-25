@@ -61,6 +61,11 @@
                         <TextBlock Style="{StaticResource Text.Helper}"
                                    Text="e.g. gpt-4o-mini, anthropic/claude-3.5-sonnet, etc."/>
 
+                        <TextBlock Text="Vision Model (OCR)" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                        <TextBox x:Name="VisionModelBox" Margin="0,4,0,0"/>
+                        <TextBlock Style="{StaticResource Text.Helper}"
+                                   Text="Used only by Vision AI OCR. Must accept images, e.g. gpt-4o, qwen3-vl, gemini-2.0-flash. Leave empty to reuse Model above."/>
+
                         <TextBlock Text="API Key" FontWeight="SemiBold" Margin="0,12,0,0"/>
                         <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>

@@ -41,14 +41,18 @@ public sealed class VisionAiOcrEngine : IOcrEngine, IDisposable
     /// <summary>Builds a configured engine, or null when the provider isn't set up.</summary>
     public static VisionAiOcrEngine? TryCreate(AppConfig cfg, HttpMessageHandler? handler = null)
     {
-        // OcrEngine uses the same API key / BaseUrl / Model as translation, but the model
-        // must be vision-capable — requiring it configured at all is the gate.
-        if (string.IsNullOrWhiteSpace(cfg.ApiKey) || string.IsNullOrWhiteSpace(cfg.BaseUrl)
-            || string.IsNullOrWhiteSpace(cfg.Model))
+        // API key + BaseUrl must be set; vision model is cfg.VisionModel (fallback cfg.Model
+        // so the OCR tab keeps working when users haven't split the two out yet).
+        if (string.IsNullOrWhiteSpace(cfg.ApiKey) || string.IsNullOrWhiteSpace(cfg.BaseUrl))
         {
             return null;
         }
-        return new VisionAiOcrEngine(cfg.ApiKey, cfg.BaseUrl, cfg.Model, handler);
+        var model = string.IsNullOrWhiteSpace(cfg.VisionModel) ? cfg.Model : cfg.VisionModel;
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return null;
+        }
+        return new VisionAiOcrEngine(cfg.ApiKey, cfg.BaseUrl, model, handler);
     }
 
     public async Task<string> RecognizeAsync(byte[] pngBytes, CancellationToken ct = default)

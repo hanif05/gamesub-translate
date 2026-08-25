@@ -297,6 +297,7 @@ public partial class MainWindow : Window
             ApiKey = _settings.ApiKey,
             BaseUrl = _settings.BaseUrl,
             Model = _settings.Model,
+            VisionModel = _settings.VisionModel,
             SourceLang = _settings.SourceLang,
             TargetLang = _settings.TargetLang,
             Providers = _settings.Providers,

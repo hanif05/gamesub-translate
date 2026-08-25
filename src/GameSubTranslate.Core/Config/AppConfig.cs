@@ -5,6 +5,8 @@ public sealed class AppConfig
     public string? ApiKey { get; init; }
     public string? BaseUrl { get; init; }
     public string? Model { get; init; }
+    /// <summary>OCR-only vision model. Falls back to <see cref="Model"/> when null/empty.</summary>
+    public string? VisionModel { get; init; }
     public string SourceLang { get; init; } = "auto";
     public string TargetLang { get; init; } = "id";
 

@@ -147,6 +147,7 @@ public partial class SettingsWindow : Window
     {
         BaseUrlBox.Text = _settings.BaseUrl ?? "";
         ModelBox.Text = _settings.Model ?? "";
+        VisionModelBox.Text = _settings.VisionModel ?? "";
         SelectCombo(SourceLangBox, _settings.SourceLang);
         SelectCombo(TargetLangBox, _settings.TargetLang);
         IntervalBox.Text = _settings.CaptureIntervalMs.ToString();
@@ -541,6 +542,7 @@ public partial class SettingsWindow : Window
         var s = _settings;
         s.BaseUrl = string.IsNullOrWhiteSpace(BaseUrlBox.Text) ? null : BaseUrlBox.Text.Trim();
         s.Model = string.IsNullOrWhiteSpace(ModelBox.Text) ? null : ModelBox.Text.Trim();
+        s.VisionModel = string.IsNullOrWhiteSpace(VisionModelBox.Text) ? null : VisionModelBox.Text.Trim();
         // T61: read from the show/hide buffer if visible, else the masked PasswordBox.
         var apiKeyInput = _apiKeyShown ? _apiKeyBuffer : ApiKeyBox.Password;
         if (!string.IsNullOrEmpty(apiKeyInput)) s.ApiKey = apiKeyInput; // empty → keep existing
