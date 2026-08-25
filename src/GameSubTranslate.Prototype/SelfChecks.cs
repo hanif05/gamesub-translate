@@ -34,6 +34,9 @@ internal static class SelfChecks
         "--selfcheck-t16" => SelfCheckT16(),
         "--selfcheck-t17" => SelfCheckT17(),
         "--selfcheck-t26" => SelfCheckT26(),
+        "--selfcheck-t80" => PaddleOcrSpike.Run(),
+        "--selfcheck-t80-gpu" => PaddleOcrSpike.RunGpu(),
+        "--selfcheck-latency" => SelfCheckLatency(),
         _ => SelfCheckT3(),
     };
 
@@ -740,5 +743,78 @@ internal static class SelfChecks
             ? "PASS: T26 cache integration — same text twice = 1 API call"
             : $"FAIL: {fails} T26 cache checks failed");
         return fails == 0 ? 0 : 1;
+    }
+
+    // ---------- Real-API latency probe ----------
+    private static int SelfCheckLatency()
+    {
+        // Env vars override DPAPI-stored settings — lets you A/B providers without re-saving
+        // through the SettingsWindow every time.
+        string? envBase = Environment.GetEnvironmentVariable("OPENAI_BASE_URL");
+        string? envModel = Environment.GetEnvironmentVariable("OPENAI_MODEL");
+        string? envKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+
+        var store = new SettingsStore();
+        var s = store.Load();
+
+        string baseUrl = !string.IsNullOrWhiteSpace(envBase) ? envBase : s.BaseUrl ?? "";
+        string model = !string.IsNullOrWhiteSpace(envModel) ? envModel : s.Model ?? "";
+        string apiKey = !string.IsNullOrWhiteSpace(envKey) ? envKey : s.ApiKey ?? "";
+
+        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(model))
+        {
+            Console.WriteLine("FAIL: provider config incomplete — set OPENAI_API_KEY/OPENAI_BASE_URL/OPENAI_MODEL or save settings in app");
+            return 1;
+        }
+        Console.WriteLine($"[config] baseUrl={baseUrl} model={model} src={s.SourceLang} tgt={s.TargetLang} (source: {(envKey is not null ? "env" : "settings.json")})");
+
+        var samples = new[]
+        {
+            "I came here from the mainland, I did.",
+            "Did a fair bit of wandering along the way, too, so I'm well familiar with the lay of the land.",
+            "It's too late for that.",
+            "If you leave the capital and set out around the gulf, you'll happen on a henge.",
+            "A band of thieves that style themselves \"the Iron Hammer.\"",
+        };
+
+        var client = new TranslationClient(apiKey, baseUrl, model, s.SourceLang, s.TargetLang);
+
+        // Single-shot probe — uses TranslateAsync path.
+        var singleMs = new List<double>();
+        Console.WriteLine("[single-shot TranslateAsync]");
+        foreach (var line in samples)
+        {
+            var sw = Stopwatch.StartNew();
+            string? translated = null;
+            try { translated = client.TranslateAsync(line).GetAwaiter().GetResult(); }
+            catch (Exception ex) { Console.WriteLine($"  ERR: {ex.GetType().Name}: {ex.Message}"); continue; }
+            sw.Stop();
+            var ms = sw.Elapsed.TotalMilliseconds;
+            singleMs.Add(ms);
+            Console.WriteLine($"  {ms,5:F0}ms  src=\"{Truncate(line, 50)}\" -> \"{Truncate(translated, 50)}\"");
+        }
+
+        if (singleMs.Count == 0)
+        {
+            Console.WriteLine("FAIL: no successful single-shot calls");
+            return 1;
+        }
+        double sMin = singleMs.Min(), sMax = singleMs.Max(), sAvg = singleMs.Average(), sMed = Median(singleMs);
+        Console.WriteLine($"[single-shot summary] min={sMin:F0}ms  med={sMed:F0}ms  avg={sAvg:F0}ms  max={sMax:F0}ms  (n={singleMs.Count})");
+
+        return 0;
+    }
+
+    private static double Median(List<double> xs)
+    {
+        var sorted = xs.OrderBy(x => x).ToList();
+        int n = sorted.Count;
+        return n % 2 == 1 ? sorted[n / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+    }
+
+    private static string Truncate(string s, int max)
+    {
+        if (s.Length <= max) return s;
+        return s[..max] + "...";
     }
 }

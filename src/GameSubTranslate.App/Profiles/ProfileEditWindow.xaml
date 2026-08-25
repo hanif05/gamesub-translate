@@ -31,6 +31,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
@@ -69,10 +70,14 @@
             <ComboBox Grid.Row="4" Grid.Column="1" x:Name="OcrEngineBox" Margin="0,4">
                 <ComboBoxItem Content="Tesseract" Tag="Tesseract"/>
                 <ComboBoxItem Content="Vision AI" Tag="VisionAi"/>
+                <ComboBoxItem Content="Paddle OCR" Tag="PaddleOcr"/>
             </ComboBox>
 
-            <TextBlock Grid.Row="5" Grid.Column="0" Text="Capture interval (ms)" VerticalAlignment="Center" Margin="0,4"/>
-            <TextBox Grid.Row="5" Grid.Column="1" x:Name="IntervalBox" Margin="0,4"/>
+            <CheckBox Grid.Row="5" Grid.Column="1" x:Name="PaddleUseGpuBox" Content="Paddle: use GPU (CUDA)" Margin="0,0,0,4" Visibility="Collapsed"
+                      ToolTip="Enable only on NVIDIA hosts with working CUDA driver. Off = CPU mkldnn path, works on any x64."/>
+
+            <TextBlock Grid.Row="6" Grid.Column="0" Text="Capture interval (ms)" VerticalAlignment="Center" Margin="0,4"/>
+            <TextBox Grid.Row="6" Grid.Column="1" x:Name="IntervalBox" Margin="0,4"/>
 
             <!-- T68: regions section header + buttons above list. -->
             <TextBlock Grid.Row="6" Grid.Column="0" Text="Regions" VerticalAlignment="Top" Margin="0,12,0,0"

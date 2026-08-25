@@ -70,5 +70,23 @@ public sealed class Database
             CREATE INDEX IF NOT EXISTS IX_CaptureRegion_ProfileId ON CaptureRegion(ProfileId);
             """;
         cmd.ExecuteNonQuery();
+
+        // F87: idempotent column add. SQLite has no IF NOT EXISTS for ALTER TABLE ADD COLUMN,
+        // so we probe pragma_table_info first. Old databases (pre-Fase 6) lack this column;
+        // running EnsureSchema on them must backfill it without breaking the app.
+        EnsureColumn(conn, "GameProfile", "PaddleUseGpu", "INTEGER NOT NULL DEFAULT 0");
+    }
+
+    private static void EnsureColumn(SqliteConnection conn, string table, string column, string definition)
+    {
+        using var probe = conn.CreateCommand();
+        probe.CommandText = $"SELECT 1 FROM pragma_table_info('{table}') WHERE name = @c";
+        probe.Parameters.AddWithValue("@c", column);
+        var exists = probe.ExecuteScalar();
+        if (exists is not null) return;
+
+        using var alter = conn.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";
+        alter.ExecuteNonQuery();
     }
 }

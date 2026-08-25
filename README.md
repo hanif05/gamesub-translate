@@ -2,7 +2,7 @@
 
 > Real-time subtitle translation overlay for PC games. Pick a region, get translated text on screen.
 
-Windows-only. C# / .NET 8 / WPF. Capture → OCR (Tesseract) → translate (OpenAI-compatible) → click-through overlay.
+Windows-only. C# / .NET 8 / WPF. Capture → OCR (Tesseract / PaddleOCR / Vision AI) → translate (OpenAI-compatible) → click-through overlay.
 
 ![Status](https://img.shields.io/badge/status-active-success)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)
@@ -20,7 +20,7 @@ Drop screenshots of the main windows into [`docs/screenshots/`](docs/screenshots
 ## What it does
 
 - Capture any rectangle of your screen (per-monitor, multi-DPI).
-- OCR with local Tesseract — no cloud round-trip for text recognition.
+- OCR engine of choice: **Tesseract** (instant, local), **PaddleOCR** (fast + accurate for stylized fonts, GPU-accelerated when CUDA available), or **Vision AI** (cloud fallback for noisy frames).
 - Translate via any OpenAI-compatible endpoint (OpenAI, OpenRouter, Groq, Ollama, LM Studio…).
 - Render result in a click-through overlay that sits on top of the game.
 - Hotkeys to toggle / pause / manually capture without leaving the game.
@@ -69,7 +69,7 @@ dotnet run --project src/GameSubTranslate.Prototype -- \
 |-------|--------|
 | UI | WPF on `net8.0-windows10.0.19041.0` |
 | Capture | `Windows.Graphics.Capture` + Win2D |
-| OCR | Tesseract (`Tesseract` NuGet by Charlesw) |
+| OCR | Tesseract (`Tesseract` by Charlesw) · PaddleOCR (`Sdcb.PaddleOCR`, Apache-2.0, CUDA optional) · Vision AI (OpenAI-compatible image endpoint) |
 | Translation | `HttpClient` to OpenAI-compatible `/chat/completions` — provider-agnostic |
 | Cache | SQLite + Dapper, exact + Levenshtein-fuzzy lookup |
 | Storage | JSON + DPAPI-encrypted secrets (`%APPDATA%/GameSubTranslate/`) |
@@ -88,7 +88,7 @@ Design system: tokens (`Resources/Tokens.xaml`), Segoe Fluent Icons, 60fps `Disp
 │   ├── GameSubTranslate.Core/        capture, OCR, translation, pipeline, config, storage
 │   └── GameSubTranslate.App/         WPF windows, hotkeys, tray, design tokens
 ├── tests/
-│   └── GameSubTranslate.Core.Tests/  xUnit (91 tests)
+│   └── GameSubTranslate.Core.Tests/  xUnit (99 tests)
 ├── assets/tessdata/                  eng.traineddata
 ├── docs/
 │   ├── PRD-Auto-Translate-Subtitle-Game.md
@@ -108,7 +108,7 @@ Design system: tokens (`Resources/Tokens.xaml`), Segoe Fluent Icons, 60fps `Disp
 dotnet test
 ```
 
-91 xUnit tests covering the change detector, translation client (retry/timeout/error categorization/failover), streaming, settings store, cache, file logger, both OCR engines, and the Fase 5 UI helpers.
+99 xUnit tests covering the change detector, translation client (retry/timeout/error categorization/failover), streaming, settings store, cache, file logger, all three OCR engines, and the Fase 5 UI helpers.
 
 ## Self-checks
 
@@ -121,9 +121,10 @@ dotnet run --project src/GameSubTranslate.App         -- --selfcheck-t14
 
 ## Known limitations
 
-- OCR ships with English only. Drop additional `*.traineddata` into `assets/tessdata/` for other languages, or switch the OCR engine to the bundled Vision-AI provider in Settings.
+- OCR ships with English only. Drop additional `*.traineddata` into `assets/tessdata/` for Tesseract, or switch to PaddleOCR / Vision AI for other languages (PaddleOCR auto-downloads the English v3 model from `paddleocr-models/` on first use).
 - End-to-end latency is dominated by the LLM API. Streaming brings first-token to sub-second; cache hits are ~0ms.
 - Free-tier providers (e.g. OpenRouter `:free`) rate-limit aggressively. The client retries with exponential backoff and falls over to a backup provider if configured.
+- PaddleOCR GPU mode requires `cudnn64_8.dll` in `PATH` (CUDA Toolkit 12.x or extract from cuDNN zip). Without it the engine falls back to CPU (mkldnn) which still works, just slower on NVIDIA hardware.
 
 ## Contributing
 

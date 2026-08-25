@@ -20,6 +20,9 @@ public partial class ProfileEditWindow : Window
     public ProfileEditWindow(GameProfile? existing = null)
     {
         InitializeComponent();
+        // F87: surface the Paddle GPU checkbox only when Paddle OCR is selected. Tesseract
+        // and Vision AI have no GPU toggle, so the control stays out of the way.
+        OcrEngineBox.SelectionChanged += (_, _) => UpdatePaddleGpuVisibilityFromCombo();
         _existing = existing;
         Title = existing is null ? "New Profile" : $"Edit Profile - {existing.Name}";
         HeaderTitle.Text = existing is null ? "New Profile" : $"Edit — {existing.Name}";
@@ -34,6 +37,8 @@ public partial class ProfileEditWindow : Window
             SelectCombo(SourceLangBox, existing.SourceLang);
             SelectCombo(TargetLangBox, existing.TargetLang);
             SelectOcrEngine(existing.OcrEngine);
+            PaddleUseGpuBox.IsChecked = existing.PaddleUseGpu;
+            UpdatePaddleGpuVisibility(existing.OcrEngine);
             IntervalBox.Text = existing.CaptureIntervalMs.ToString();
         }
         else
@@ -41,6 +46,7 @@ public partial class ProfileEditWindow : Window
             SelectCombo(SourceLangBox, "auto");
             SelectCombo(TargetLangBox, "id");
             OcrEngineBox.SelectedIndex = 0;
+            UpdatePaddleGpuVisibility(OcrEngineKind.Tesseract);
             IntervalBox.Text = "800";
         }
     }
@@ -109,6 +115,23 @@ public partial class ProfileEditWindow : Window
         }
     }
 
+    // F87: surface the Paddle GPU checkbox only when Paddle OCR is selected. Tesseract
+    // and Vision AI have no GPU toggle, so the control stays out of the way.
+    private void UpdatePaddleGpuVisibility(OcrEngineKind kind)
+    {
+        PaddleUseGpuBox.Visibility = kind == OcrEngineKind.PaddleOcr
+            ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void UpdatePaddleGpuVisibilityFromCombo()
+    {
+        if (OcrEngineBox.SelectedItem is System.Windows.Controls.ComboBoxItem cbi && cbi.Tag is string s
+            && Enum.TryParse<OcrEngineKind>(s, out var kind))
+        {
+            UpdatePaddleGpuVisibility(kind);
+        }
+    }
+
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(NameBox.Text))
@@ -136,6 +159,7 @@ public partial class ProfileEditWindow : Window
             SourceLang = (SourceLangBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "auto",
             TargetLang = (TargetLangBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "id",
             OcrEngine = ocr,
+            PaddleUseGpu = PaddleUseGpuBox.IsChecked == true,
             CaptureIntervalMs = interval,
             Regions = _regions.ToList(),
             CreatedAt = _existing?.CreatedAt ?? DateTime.UtcNow,

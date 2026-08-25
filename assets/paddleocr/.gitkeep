@@ -1,0 +1,5 @@
+PaddleOCR model is downloaded on first engine init via Sdcb.PaddleOCR.Models.Online
+(OnlineFullModels.EnglishV3.DownloadAsync()) and cached to %APPDATA%/paddleocr-models/.
+No bundled model files needed — first launch pays the ~100MB download, subsequent runs
+hit the disk cache. Switching to Sdcb (T90) dropped the raoyutian-era requirement of
+bundling the model via MSBuild targets.

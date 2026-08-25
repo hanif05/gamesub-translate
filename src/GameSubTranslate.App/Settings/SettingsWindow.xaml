@@ -184,9 +184,12 @@
                         <ComboBox x:Name="OcrEngineBox" Margin="0,4,0,0" Width="180" HorizontalAlignment="Left">
                             <ComboBoxItem Content="Tesseract" Tag="Tesseract"/>
                             <ComboBoxItem Content="Vision AI" Tag="VisionAi"/>
+                            <ComboBoxItem Content="Paddle OCR" Tag="PaddleOcr"/>
                         </ComboBox>
                         <TextBlock Style="{StaticResource Text.Helper}"
-                                   Text="Tesseract is local + fast. Vision AI handles exotic fonts but needs API quota."/>
+                                   Text="Tesseract is local + fast. Vision AI handles exotic fonts but needs API quota. Paddle OCR is on-device GPU/CPU, fast and accurate for stylized fonts."/>
+                        <CheckBox x:Name="PaddleUseGpuBox" Content="Paddle: use GPU (CUDA)" Margin="0,8,0,0" Visibility="Collapsed"
+                                  ToolTip="Enable only on NVIDIA hosts with working CUDA driver. Off = CPU mkldnn path, works on any x64."/>
                     </StackPanel>
                 </Border>
             </TabItem>

@@ -36,10 +36,12 @@ public sealed class SettingsStore
                 ApiKey = Decrypt(dto.ApiKeyEncrypted),
                 BaseUrl = dto.BaseUrl,
                 Model = dto.Model,
+                VisionModel = dto.VisionModel,
                 SourceLang = dto.SourceLang ?? "auto",
                 TargetLang = dto.TargetLang ?? "id",
                 CaptureIntervalMs = dto.CaptureIntervalMs > 0 ? dto.CaptureIntervalMs : 800,
                 OcrEngine = dto.OcrEngine,
+                PaddleUseGpu = dto.PaddleUseGpu,
                 OverlayFontFamily = dto.OverlayFontFamily ?? "Segoe UI",
                 OverlayFontSize = dto.OverlayFontSize > 0 ? dto.OverlayFontSize : 20,
                 OverlayTextColor = dto.OverlayTextColor ?? "#FFFFFF",
@@ -75,10 +77,12 @@ public sealed class SettingsStore
             ApiKeyEncrypted = Encrypt(s.ApiKey),
             BaseUrl = s.BaseUrl,
             Model = s.Model,
+            VisionModel = s.VisionModel,
             SourceLang = s.SourceLang,
             TargetLang = s.TargetLang,
             CaptureIntervalMs = s.CaptureIntervalMs,
             OcrEngine = s.OcrEngine,
+            PaddleUseGpu = s.PaddleUseGpu,
             OverlayFontFamily = s.OverlayFontFamily,
             OverlayFontSize = s.OverlayFontSize,
             OverlayTextColor = s.OverlayTextColor,
@@ -127,10 +131,12 @@ public sealed class SettingsStore
         public string? ApiKeyEncrypted { get; set; }
         public string? BaseUrl { get; set; }
         public string? Model { get; set; }
+        public string? VisionModel { get; set; }
         public string? SourceLang { get; set; }
         public string? TargetLang { get; set; }
         public int CaptureIntervalMs { get; set; }
         public OcrEngineKind OcrEngine { get; set; }
+        public bool PaddleUseGpu { get; set; }
         public string? OverlayFontFamily { get; set; }
         public double OverlayFontSize { get; set; }
         public string? OverlayTextColor { get; set; }
