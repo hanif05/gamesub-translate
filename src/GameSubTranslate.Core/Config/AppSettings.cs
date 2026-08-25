@@ -22,6 +22,10 @@ public sealed class AppSettings
     public string? ApiKey { get; set; }
     public string? BaseUrl { get; set; }
     public string? Model { get; set; }
+    /// <summary>Vision-capable model for VisionAiOcrEngine (OCR). Separate from <see cref="Model"/>
+    /// because translation usually runs on a cheap text model (e.g. gpt-4o-mini) that returns
+    /// HTTP 400 when fed an image_url. Empty → falls back to <see cref="Model"/>.</summary>
+    public string? VisionModel { get; set; }
     public string SourceLang { get; set; } = "auto";
     public string TargetLang { get; set; } = "id";
     public int CaptureIntervalMs { get; set; } = 800;
