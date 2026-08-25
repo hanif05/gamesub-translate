@@ -1,26 +1,38 @@
-using PaddleOCRSharp;
+using OpenCvSharp;
+using Sdcb.PaddleInference;
+using Sdcb.PaddleOCR;
+using Sdcb.PaddleOCR.Models;
+using Sdcb.PaddleOCR.Models.Online;
 using Timer = System.Threading.Timer;
 
 namespace GameSubTranslate.Ocr;
 
 /// <summary>
-/// F82: PaddleOCRSharp-backed OCR engine. Lazy in-process init + idle dispose, mirrors
-/// <see cref="TesseractOcrEngine"/> so swapping engines in Settings is a no-op for the
-/// pipeline. CPU path is mkldnn (MKL is Intel-tuned but still beats Tesseract on AMD per
-/// T80 spike: warm median 103ms vs Tesseract ~100ms, with noticeably better accuracy on
-/// stylized fonts). GPU path is CUDA-only — user must set AppSettings.PaddleUseGpu when
-/// they know the host is NVIDIA + driver is good.
+/// F82 (rewritten on the Sdcb stack): PaddleOCR-backed OCR engine via Sdcb.PaddleInference.
+/// Replaces raoyutian PaddleOCRSharp because the latter's free NuGet is CPU-only (its
+/// <c>use_gpu=true</c> flag is silently ignored — runtime banner prints "current CPU version").
+/// Sdcb exposes <see cref="PaddleDevice.Gpu"/> as a first-class API and ships free
+/// cu120 runtime variants. We're targeting cu120-sm61-75 so the bundled native stack
+/// supports GTX 10/16 series (sm_61, sm_75). The user's hardware is a GTX 1650 Ti (Turing,
+/// sm_75), which lands inside that bracket.
 ///
-/// Why lazy: <c>PaddleOCREngine</c> ctor loads ONNX/nb files into native memory (~250ms
-/// on cold cache). Defer to first Recognize so app startup stays snappy.
+/// Lazy init + idle dispose, mirrors <see cref="TesseractOcrEngine"/> so swapping engines in
+/// Settings is a no-op for the pipeline. CPU path is mkldnn (Intel-tuned but still beats
+/// Tesseract on AMD per T80 spike: warm median 103ms vs Tesseract ~100ms). GPU path is
+/// CUDA-only — user must set AppSettings.PaddleUseGpu when they know the host is NVIDIA +
+/// driver + CUDA 12 runtime is present.
+///
+/// Why lazy: <c>PaddleOcrAll</c> ctor loads .nb / .pdmodel files into native memory
+/// (~250ms on cold cache). Defer to first Recognize so app startup stays snappy.
 /// Why idle dispose: holds native handles + ~120MB model resident even when idle. After
 /// <see cref="IdleDisposeDefault"/> without a Recognize call we release; next call
 /// re-inits in ~250ms. Production pattern: subtitle-still user pays effectively zero
 /// memory + CPU between bursts.
 ///
-/// T82: confidence filtering deferred to T85. The OCRParameter here enables
-/// classification (cls=true) and standard detection thresholds — good defaults for
-/// game subtitles, no per-game tuning needed yet.
+/// F82 (confidence): not exposed yet — RecognizeAsync returns plain string. Hybrid
+/// fallback (T85) deferred. New with Sdcb: model is downloaded from PaddleOCR's official
+/// repo on first init via OnlineFullModels.EnglishV3.DownloadAsync() — cached on disk so
+/// only the first launch pays the download cost.
 /// </summary>
 public sealed class PaddleOcrEngine : IOcrEngine, IDisposable
 {
@@ -31,7 +43,8 @@ public sealed class PaddleOcrEngine : IOcrEngine, IDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Timer _idleTimer;
 
-    private PaddleOCREngine? _engine;
+    private PaddleOcrAll? _engine;
+    private FullOcrModel? _model;
     private bool _disposed;
 
     public PaddleOcrEngine(bool useGpu = false, TimeSpan? idleDisposeAfter = null)
@@ -49,8 +62,8 @@ public sealed class PaddleOcrEngine : IOcrEngine, IDisposable
     public Task<string> RecognizeAsync(byte[] pngBytes, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        // PaddleOCRSharp's DetectText is synchronous + native and blocks the calling
-        // thread. Run it on the thread pool so the WPF UI thread never stalls, same as
+        // PaddleOCR's Run is synchronous + native and blocks the calling thread. Run
+        // it on the thread pool so the WPF UI thread never stalls, same as
         // TesseractOcrEngine.
         return Task.Run(() => RecognizeSync(pngBytes), ct);
     }
@@ -62,8 +75,16 @@ public sealed class PaddleOcrEngine : IOcrEngine, IDisposable
         {
             ThrowIfDisposed();
             EnsureEngineLocked();
-            var result = _engine!.DetectText(pngBytes);
-            // Paddle pads with newlines between text regions. Normalize to single spaces
+            // Decode PNG bytes into an OpenCV Mat for Sdcb. ImDecode with Color flag gives
+            // 3-channel BGR — what PaddleOCR's Run expects. The Mat is IDisposable but
+            // Sdcb.Run doesn't take ownership; we own it for the lifetime of this call.
+            using var mat = Cv2.ImDecode(pngBytes, ImreadModes.Color);
+            if (mat.Empty())
+            {
+                return string.Empty;
+            }
+            var result = _engine!.Run(mat);
+            // PaddleOCR joins detected text regions with "\n". Normalize to single spaces
             // so downstream ChangeDetector's text diff doesn't churn on geometry-only
             // variations of the same dialog line.
             return (result?.Text ?? "").Replace('\n', ' ').Trim();
@@ -75,53 +96,48 @@ public sealed class PaddleOcrEngine : IOcrEngine, IDisposable
         }
     }
 
-    /// <summary>Initialise the engine if needed. MUST be called under _gate. Throws
-    /// <see cref="OcrEngineLoadException"/> when the bundled model is missing or the
-    /// native stack can't load — same error shape as Tesseract so callers can show one
-    /// consistent message ("letakkan model di assets/paddleocr/") regardless of engine.</summary>
+    /// <summary>Initialise the engine + download model if needed. MUST be called under _gate.
+    /// Throws <see cref="OcrEngineLoadException"/> when the native stack can't load or the
+    /// model download fails — same error shape as Tesseract so callers can show one
+    /// consistent message regardless of engine.</summary>
     private void EnsureEngineLocked()
     {
         if (_engine is not null) return;
         try
         {
-            // Default config = null → engine reads ./inference/PaddleOCR.config.json that
-            // PaddleOCRSharp.targets dropped into the output dir. OCRParameter tuned for
-            // game subtitles: cls enabled (handles upside-down text in cutscenes), 960px
-            // long-side cap (faster than default 1536, plenty for 1920x1080 captures),
-            // 10-thread CPU path for parallelism. T82's spike validated this profile.
-            _engine = new PaddleOCREngine((OCRModelConfig?)null, new OCRParameter
+            // OnlineFullModels.EnglishV3.DownloadAsync() downloads the English PP-OCRv3
+            // model files (det/cls/rec) to a NuGet-managed cache dir on first call and
+            // returns a FullOcrModel that points at them. Subsequent calls hit the
+            // cache. DownloadAsync is async-only — we block briefly via .GetAwaiter() on
+            // the worker thread, which is acceptable because we're already inside the
+            // thread-pool Task.Run that RecognizeAsync scheduled.
+            _model ??= OnlineFullModels.EnglishV3.DownloadAsync().GetAwaiter().GetResult();
+
+            var device = _useGpu ? PaddleDevice.Gpu() : PaddleDevice.Mkldnn();
+            _engine = new PaddleOcrAll(_model, device)
             {
-                use_gpu = _useGpu,
-                gpu_id = 0,
-                gpu_mem = 4000,
-                cpu_math_library_num_threads = 10,
-                enable_mkldnn = true,
-                max_side_len = 960,
-                det = true,
-                rec = true,
-                cls = true,
-                use_angle_cls = false,    // subtitles aren't rotated; skip the extra forward pass
-                det_db_thresh = 0.3f,
-                det_db_box_thresh = 0.5f,
-                rec_batch_num = 6,
-            });
+                // Subtitles aren't rotated; skip the angle-classification forward pass
+                // to save ~30% of GPU/CPU time per frame.
+                AllowRotateDetection = false,
+                Enable180Classification = false,
+            };
         }
         catch (DllNotFoundException ex)
         {
-            // Native stack missing — happens if Paddle.Runtime.win_x64 didn't deploy
-            // (e.g. user moved the exe without its siblings). Surface a clear message
-            // instead of an opaque DllNotFoundException.
+            // Native stack missing — happens if the cu120 runtime package didn't deploy
+            // its DLLs next to the exe (or user copied only GameSubTranslate.App.exe).
             throw new OcrEngineLoadException(
-                "Gagal memuat PaddleOCR runtime. Pastikan Paddle.Runtime.win_x64 terinstal dan file .dll native ada di folder output.",
+                "Gagal memuat PaddleOCR runtime native. Pastikan paket Sdcb.PaddleInference.runtime.win64.cu120-sm61-75 terinstal dan file .dll native ada di folder output.",
                 ex);
         }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException)
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or OpenCvSharpException)
         {
-            // IOException: model files missing/corrupt. InvalidOperationException: Paddle
-            // native init failure (e.g. config JSON malformed). Both surface as the same
-            // user-facing "letakkan model" message.
+            // IOException: model file corrupt on disk. InvalidOperationException: paddle
+            // native init failure (e.g. CUDA driver/runtime mismatch). OpenCvSharpException:
+            // ImDecode failure (rare — usually means a malformed PNG). All surface as the
+            // same user-facing "engine init failed" message.
             throw new OcrEngineLoadException(
-                "Gagal memuat PaddleOCR. Pastikan model ada di folder inference/ di sebelah executable.",
+                "Gagal memuat PaddleOCR. Periksa driver NVIDIA + CUDA 12 runtime, atau matikan GPU toggle di Settings untuk fallback CPU.",
                 ex);
         }
     }
@@ -137,6 +153,9 @@ public sealed class PaddleOcrEngine : IOcrEngine, IDisposable
                 {
                     _engine.Dispose();
                     _engine = null;
+                    // Keep _model cached — re-downloading every idle cycle would be
+                    // wasteful. The disk-cached .pdmodel files are small (~120MB total)
+                    // and shared across engine lifetimes.
                 }
             }
             finally { _gate.Release(); }
@@ -157,6 +176,8 @@ public sealed class PaddleOcrEngine : IOcrEngine, IDisposable
         {
             _engine?.Dispose();
             _engine = null;
+            // _model intentionally not disposed: FullOcrModel is a lightweight wrapper
+            // around cached file paths; disposing it would just invalidate references.
         }
         finally { _gate.Release(); }
         _gate.Dispose();

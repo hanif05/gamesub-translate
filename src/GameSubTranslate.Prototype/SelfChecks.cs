@@ -35,6 +35,7 @@ internal static class SelfChecks
         "--selfcheck-t17" => SelfCheckT17(),
         "--selfcheck-t26" => SelfCheckT26(),
         "--selfcheck-t80" => PaddleOcrSpike.Run(),
+        "--selfcheck-t80-gpu" => PaddleOcrSpike.RunGpu(),
         _ => SelfCheckT3(),
     };
 

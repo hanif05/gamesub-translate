@@ -5,9 +5,10 @@ using Xunit;
 namespace GameSubTranslate.Core.Tests.Ocr;
 
 /// <summary>T84: PaddleOcrEngine lazy init, Recognize roundtrip, idle dispose, exception typing.
-/// Mirrors TesseractOcrEngineTests — same surface, same expectations. The bundled model is
-/// deployed by PaddleOCRSharp.targets into the test output's ./inference/ directory, so
-/// init succeeds without manual setup.</summary>
+/// Mirrors TesseractOcrEngineTests — same surface, same expectations. The English model is
+/// downloaded from PaddleOCR's online model repo on first init via
+/// OnlineFullModels.EnglishV3.DownloadAsync() and cached on disk — subsequent runs hit the
+/// cache, no network needed.</summary>
 public class PaddleOcrEngineTests
 {
     [Fact]
@@ -25,11 +26,12 @@ public class PaddleOcrEngineTests
     {
         // Real PNG that Paddle can actually parse (Paddle doesn't bail on a 8-byte stub
         // the way Tesseract does — it tries to decode the image). 800x80 white bg, black
-        // text, default Arial — same as the T80 spike.
+        // text, default Arial — same as the T80 spike. First call downloads the model,
+        // so allow a long timeout for the cold init.
         using var engine = new PaddleOcrEngine();
         var png = MakeSubtitleFrame("The quick brown fox jumps over the lazy dog", 800, 80);
 
-        var text = await engine.RecognizeAsync(png);
+        var text = await engine.RecognizeAsync(png).WaitAsync(TimeSpan.FromMinutes(2));
 
         // Paddle normalizes inter-region newlines to spaces, then Trim()s. Assert at
         // least one known word survives — the model is multi-lingual but English should
@@ -46,7 +48,7 @@ public class PaddleOcrEngineTests
         using var engine = new PaddleOcrEngine();
         var png = MakeSubtitleFrame("Hello world", 400, 60);
 
-        await engine.RecognizeAsync(png);
+        await engine.RecognizeAsync(png).WaitAsync(TimeSpan.FromMinutes(2));
         Assert.NotNull(GetPaddleEngine(engine));
 
         var second = await engine.RecognizeAsync(png);
@@ -71,7 +73,7 @@ public class PaddleOcrEngineTests
         // (no public API for that); checking the field is enough.
         using var engine = new PaddleOcrEngine();
         var png = MakeSubtitleFrame("Test", 200, 40);
-        await engine.RecognizeAsync(png);
+        await engine.RecognizeAsync(png).WaitAsync(TimeSpan.FromMinutes(2));
 
         engine.Dispose();
         Assert.Null(GetPaddleEngine(engine));

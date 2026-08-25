@@ -4,8 +4,11 @@ public enum OcrEngineKind
 {
     Tesseract,
     VisionAi,
-    /// <summary>F82: PaddleOCR on-device engine. Tied to PaddleOCRSharp NuGet + bundled
-    /// PP-OCRv5 model. CPU (mkldnn) is the default; flip AppSettings.PaddleUseGpu for CUDA.</summary>
+    /// <summary>F82: PaddleOCR on-device engine. Tied to Sdcb.PaddleOCR NuGet (replaces
+    /// raoyutian PaddleOCRSharp since T90 — free raoyutian NuGet was CPU-only and silently
+    /// ignored use_gpu). English model auto-downloads via OnlineFullModels.EnglishV3.DownloadAsync().
+    /// CPU (mkldnn) is the default; flip AppSettings.PaddleUseGpu for CUDA — requires cuDNN
+    /// in PATH at runtime.</summary>
     PaddleOcr,
 }
 

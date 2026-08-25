@@ -1,6 +1,6 @@
 # TASKS — Breakdown Fase 6 (OCR Acceleration)
 
-**Status:** ✅ Fase 6.A selesai (T80-T84) + T87 done (per-profile PaddleUseGpu + pipeline override fix). Branch `feature/fase-6-ocr-acceleration`. 7 commit, 8 test baru (91→99), `dotnet test` green.
+**Status:** ✅ Fase 6.A selesai (T80-T84) + T87 done (per-profile PaddleUseGpu + pipeline override fix) + T90 done (library swap raoyutian → Sdcb, GPU path actually invoked now). Branch `feature/fase-6-ocr-acceleration`. 7+ commit, 99/99 tests green, `dotnet test` green.
 **Branch target:** `feature/fase-6-ocr-acceleration` (dibuat dari `main` setelah Fase 5 merged).
 **Estimasi roadmap:** 1–2 minggu.
 **Dependency:** Fase 5 selesai (T55–T77 merged, 91+ tests green). Merge `fix/vision-model-ocr` (T78 + T79 already in main) jadi baseline.
@@ -28,7 +28,7 @@ OCR comparison (literature, bukan benchmark lokal — T80 spike akan validasi re
 |---|---|---|---|---|
 | Tesseract (sekarang) | 200-500ms cold, ~100ms warm | CPU | Medium | None |
 | Windows.Media.Ocr (Win10/11 built-in) | 100-200ms | CPU | Low-Medium (English only) | None |
-| PaddleOCRSharp | 50-100ms (NVIDIA CUDA) / 200-300ms (CPU mkldnn) | CUDA only | **High** | None |
+| Sdcb.PaddleOCR (Fase 6.A — raoyutian sebelumnya) | 50-100ms (CUDA) / 79ms CPU mkldnn validated T90 | CUDA (free) | **High** | None |
 | Vision AI (sekarang fallback) | 1-3s | - | Very High | Required |
 
 Pilihan hybrid: Tesseract (fast, lokal) + Vision AI (akurat, network) — sudah ada di Fase 2. Fase 6 tambah **third option: PaddleOCR** (fast + akurat + lokal) buat game dengan subtitle stylized tapi lo gak mau burn API quota.
@@ -37,24 +37,24 @@ Pilihan hybrid: Tesseract (fast, lokal) + Vision AI (akurat, network) — sudah 
 
 ## Library Evaluation (sudah di-spike via Context7 docs)
 
-| | RapidOcrNet | PaddleOCRSharp |
-|---|---|---|
-| Backend | ONNX Runtime (direct) | Paddle native (Paddle.Runtime.win_x64) |
-| GPU support | CUDA (NVIDIA only) — bisa fallback ke DirectML EP via custom SessionOptions | CUDA (NVIDIA only) — **bukan DirectML**. GPU SDK versi dijual terpisah sebagai add-on commercial |
-| Image processing | SkiaSharp | OpenCV wrapper |
-| .NET 8 ready | ✅ | ✅ |
-| NuGet setup | Sederhana (1 package) | 2 packages (Sharp + Runtime.win_x64) |
-| Size | ~30MB | ~100MB+ runtime |
-| Speed (GPU NVIDIA) | 50-100ms | 50-100ms |
-| Speed (CPU only / non-NVIDIA) | 200-300ms | 200-300ms (mkldnn) |
+| | RapidOcrNet | Sdcb.PaddleOCR (pilih di T90) | PaddleOCRSharp (raoyutian, di-deprecate T90) |
+|---|---|---|---|
+| Backend | ONNX Runtime (direct) | Paddle native (PaddleInference runtime 2.6.1 + cu120-sm61-75) | Paddle native (Paddle.Runtime.win_x64) |
+| GPU support | CUDA + DirectML EP possible | CUDA (free via cu*_sm* runtime) | CUDA — **commercial add-on** (free NuGet is CPU-only, silently ignores use_gpu flag) |
+| Image processing | SkiaSharp | OpenCvSharp4 | OpenCV wrapper |
+| .NET 8 ready | ✅ | ✅ | ✅ |
+| NuGet setup | Sederhana (1 package) | 6 packages (Inference + OCR + Models.Online + runtime + OpenCvSharp4 ×2) | 2 packages (Sharp + Runtime.win_x64) |
+| Size | ~30MB | ~100MB+ runtime | ~100MB+ runtime |
+| Speed (GPU NVIDIA) | 50-100ms | 50-100ms (cu126_cudnn95_sm75 validated T90 on sm_75 = GTX 1650 Ti; needs cuDNN in PATH) | 50-100ms — tapi **gak aktif** di free NuGet |
+| Speed (CPU only / non-NVIDIA) | 200-300ms | 79ms validated T90 (mkldnn) | 103ms T80 baseline |
 
-**Catatan GPU claim**: PaddleOCRSharp **TIDAK support DirectML**. Bukti: `OCRParameter` struct cuma expose `use_gpu` boolean + `gpu_mem` + `use_tensorrt`, gak ada DirectML provider. Backend underlying = PaddleInference (PaddlePaddle native), yang GPU-nya CUDA + TensorRT only. Untuk DirectML, alternatifnya ONNX Runtime langsung (atau RapidOcrNet yang basic-nya pakai ONNX Runtime).
+**Catatan GPU claim**: raoyutian PaddleOCRSharp **TIDAK punya GPU path di free NuGet**. Runtime banner native bilang "当前使用的是CPU版本" (currently loaded CPU version) — GPU flag di-ignore, fallback CPU silent. Fix: commercial license (kontak QQ 277784829). Atau swap ke Sdcb (T90).
 
-**Hardware user**: NVIDIA + AMD dual GPU (hybrid graphics, kemungkinan laptop). NVIDIA bakal aktif untuk CUDA — PaddleOCRSharp works di setup ini. AMD gak akan dipake PaddleOCRSharp.
+**Hardware user**: NVIDIA + AMD dual GPU (hybrid graphics, kemungkinan laptop). NVIDIA bakal aktif untuk CUDA — Sdcb dengan cu120-sm61-75 runtime support sm_75 (GTX 1650 Ti). AMD gak akan dipake Sdcb.
 
-**Rekomendasi**: `PaddleOCRSharp` masih OK karena user punya NVIDIA. Tapi kalo di masa depan ada user tanpa NVIDIA, pertimbangkan RapidOcrNet + custom SessionOptions dengan DirectML EP (raw ONNX Runtime). Untuk sekarang, **pilih PaddleOCRSharp** (battle-tested, score Context7 lebih tinggi 89.81 vs 83.5) — T80 spike validates GPU acceleration benar-benar aktif.
+**Rekomendasi akhir**: `Sdcb.PaddleOCR` (Apache-2.0, free CUDA, validated T90) replacing raoyutian. RTX 30/40 users swap runtime ke cu120-sm86 atau cu120-sm89.
 
-Reference: Context7 docs `/raoyutian/paddleocrsharp` (score 89.81), `/bobld/rapidocrnet` (score 83.5).
+Reference: Context7 docs `/sdcb/paddlesharp` (Apache-2.0, score 73.5), `/raoyutian/paddleocrsharp` (CPU-only free), `/bobld/rapidocrnet` (score 83.5).
 
 ---
 
@@ -179,6 +179,43 @@ Ini non-trivial — impact ke:
 - 96→99 green
 
 **Tradeoff**: profile dengan OcrEngine=Tesseract (default value) implicitly = "pakai global". Tidak bisa bedain dari "user memang mau Tesseract per-profile". Acceptable: 99% user pilih non-default per profile. Kalo perlu eksplisit, tambah field `UseGlobalOcrEngine bool` di next iteration.
+
+---
+
+### FASE 6.E — Library Swap raoyutian → Sdcb (revisi total PaddleOCR)
+
+#### T90. Replace PaddleOCRSharp (raoyutian) dengan Sdcb.PaddleOCR
+**Status**: ✅ done. Build green, 99/99 tests pass, CPU spike warm median **79ms** (vs raoyutian 103ms), GPU spike throws real `cudnn64_8.dll` not-configured error (proves GPU path is actually invoked — bukan silent CPU fallback lagi).
+
+**Deskripsi**: Investigasi pasca-T89 ngungkap root cause kenapa PaddleOCR jalan tapi gak pake GPU: raoyutian PaddleOCRSharp 6.2.0 NuGet adalah **free Community Edition** yang paket CUDA-nya cuma stub. Runtime banner native bilang "当前使用的是CPU版本" (currently loaded CPU version) bahkan kalo `use_gpu=true` di-pass — flag di-ignore, fallback CPU silent. GPU versi dijual terpisah sebagai commercial add-on (kontak QQ 277784829).
+
+**Solusi**: swap ke **Sdcb.PaddleOCR** (Apache-2.0, maintained) yang expose `PaddleDevice.Gpu()` sebagai first-class API + ship free CUDA runtime variants. Paket:
+- `Sdcb.PaddleOCR 2.7.0.3` — wrapper API
+- `Sdcb.PaddleOCR.Models.Online 2.7.0` — `OnlineFullModels.EnglishV3.DownloadAsync()`
+- `Sdcb.PaddleInference.runtime.win64.cu120-sm61-75 2.6.1` — runtime native + CUDA 12, support sm_61 (GTX 10) dan sm_75 (GTX 16 termasuk 1650 Ti user)
+- `OpenCvSharp4 4.10.0.20240616` — Mat decode (Sdcb butuh versi ini, bukan 4.11+)
+
+**API rewrite**: 
+- `PaddleOCREngine` → `PaddleOcrAll`
+- `OCRParameter { use_gpu, gpu_id, gpu_mem, enable_mkldnn, ... }` → `PaddleDevice.Gpu()` atau `PaddleDevice.Mkldnn()` (returns `Action<PaddleConfig>` lambda)
+- `engine.DetectText(byte[] png)` → `engine.Run(Mat)` — bytes di-decode dulu via `Cv2.ImDecode(bytes, ImreadModes.Color)`
+- `OnlineFullModels.EnglishV3.DownloadAsync()` download dari paddleocr.bj.bcebos.com, cache ke `%APPDATA%/paddleocr-models/`
+
+**Version alignment gotcha**: `Sdcb.PaddleOCR.Models.Online` 2.7.0 di-compile against `Sdcb.PaddleOCR 2.7.0.x`. Kalau NuGet resolve ke 2.5.0 (transitive default) → runtime `MissingMethodException: FileDetectionModel..ctor(string)` (signature changed in 2.7.0.1+). Fix: pin OCR + Models.Online ke versi aligned (2.7.0.3 + 2.7.0).
+
+**Files touched**:
+- `src/GameSubTranslate.Core/GameSubTranslate.Core.csproj` — drop PaddleOCRSharp + Paddle.Runtime.win_x64, add 6 Sdcb/OpenCvSharp4 packages
+- `src/GameSubTranslate.Prototype/GameSubTranslate.Prototype.csproj` — same swap (direct ref needed for native DLL copy per CLAUDE.md gotcha)
+- `src/GameSubTranslate.Core/Ocr/PaddleOcrEngine.cs` — rewrite API + add OpenCvSharp Mat decode + OnlineFullModels download
+- `src/GameSubTranslate.Prototype/PaddleOcrSpike.cs` — rewrite Run() + RunGpu() to use PaddleOcrAll
+- `tests/GameSubTranslate.Core.Tests/Ocr/PaddleOcrEngineTests.cs` — comment update + 2-min WaitAsync timeout for cold init (model download first time)
+
+**Known issues**:
+- **GPU path requires cuDNN in PATH**. First run on user's machine will throw `PreconditionNotMetError: cudnn64_8.dll ... not configured correctly`. Fix: install CUDA Toolkit 12.x + cuDNN 8, atau extract cuDNN ke `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.x\bin\`. Setelah ada di PATH, GPU spike bakal run tanpa error.
+- **CPU path works out of the box** — verified by self-check: cold 891ms, warm median 79ms (better than raoyutian's 103ms thanks to newer PaddleInference native stack).
+- **EnglishV3 model auto-downloads** on first init (~100MB to `%APPDATA%/paddleocr-models/`). Subsequent runs hit cache, zero network.
+
+**Done when**: 99/99 tests pass ✅, CPU spike PASS ✅, GPU spike surfaces actionable cuDNN error (proves real GPU attempt, not silent fallback) ✅.
 
 ---
 

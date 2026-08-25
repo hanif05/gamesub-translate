@@ -16,8 +16,20 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.1" />
-    <PackageReference Include="Paddle.Runtime.win_x64" Version="3.3.0.1" />
-    <PackageReference Include="PaddleOCRSharp" Version="6.2.0" />
+    <!-- Sdcb.PaddleOCR (Apache-2.0) replaces raoyutian PaddleOCRSharp because the latter's
+         free NuGet is CPU-only (commercial license required for CUDA). Sdcb exposes
+         PaddleDevice.Gpu() and ships a free cu runtime variant — pick the sm version
+         that matches the user's GPU. cu120-sm61-75 covers GTX 10/16 series (sm_61, sm_75)
+         — the GTX 1650 Ti (Turing, sm_75) shipped in the user's hardware. RTX 30/40
+         users would swap to cu120-sm86 or cu120-sm89 in a future iteration. Versions
+         must stay aligned: Sdcb.PaddleOCR 2.7.0.1 ↔ Sdcb.PaddleOCR.Models.Online 2.7.0
+         (each Models.Online release pins to a specific OCR version — confirmed via
+         MissingMethodException when OCR 2.7.0.1 was paired with Models.Online 2.5.0). -->
+    <PackageReference Include="Sdcb.PaddleOCR" Version="2.7.0.3" />
+    <PackageReference Include="Sdcb.PaddleOCR.Models.Online" Version="2.7.0" />
+    <PackageReference Include="Sdcb.PaddleInference.runtime.win64.cu120-sm61-75" Version="2.6.1" />
+    <PackageReference Include="OpenCvSharp4" Version="4.10.0.20240616" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.10.0.20240616" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
