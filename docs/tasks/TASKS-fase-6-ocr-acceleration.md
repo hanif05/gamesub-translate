@@ -1,6 +1,6 @@
 # TASKS — Breakdown Fase 6 (OCR Acceleration)
 
-**Status:** ✅ Fase 6.A selesai (T80-T84). Branch `feature/fase-6-ocr-acceleration`. 5 commit, 5 test baru (91→96), `dotnet test` green.
+**Status:** ✅ Fase 6.A selesai (T80-T84) + T87 done (per-profile PaddleUseGpu + pipeline override fix). Branch `feature/fase-6-ocr-acceleration`. 7 commit, 8 test baru (91→99), `dotnet test` green.
 **Branch target:** `feature/fase-6-ocr-acceleration` (dibuat dari `main` setelah Fase 5 merged).
 **Estimasi roadmap:** 1–2 minggu.
 **Dependency:** Fase 5 selesai (T55–T77 merged, 91+ tests green). Merge `fix/vision-model-ocr` (T78 + T79 already in main) jadi baseline.
@@ -164,9 +164,27 @@ Ini non-trivial — impact ke:
 
 ---
 
+### FASE 6.D — Per-Profile PaddleUseGpu + Pipeline Override Fix
+
+#### T87. PaddleUseGpu per-profile + fix pre-Fase 6 pipeline-override bug
+**Status**: ✅ done (commit `0973958` + `e864370`).
+**Deskripsi**: T83/T84 cuma add PaddleUseGpu di **Settings** (global). User report: ProfileEditWindow belum expose-nya. Investigasi: ProfileEditWindow juga belum expose OcrEngine Paddle sampai commit `caf51ce` (T87 step 1), dan **pipeline pre-Fase 6 diam-diam abaikan profile.OcrEngine** (MainWindow.EnsurePipeline cuma pakai `_settings.OcrEngine`). Patch 3 file:
+- `GameProfile.PaddleUseGpu` field (default false)
+- `Database.EnsureSchema` backfill PaddleUseGpu column via `pragma_table_info` probe + `ALTER TABLE` (idempotent)
+- `ProfileRepository` SELECT/INSERT/UPDATE/ProfileRow/ProfileDto wired
+- `ProfileDto.SchemaVersion` 1→2
+- `ProfileEditWindow.xaml` row 5 reshuffle + `PaddleUseGpuBox` CheckBox visible only when OcrEngine=PaddleOcr
+- `MainWindow.EnsurePipeline` profile override chain: `activeProfile?.OcrEngine ?? _settings.OcrEngine` (juga PaddleUseGpu, SourceLang, TargetLang, CaptureIntervalMs)
+- 3 tests: roundtrip, flip, pre-Fase 6 migration backfill
+- 96→99 green
+
+**Tradeoff**: profile dengan OcrEngine=Tesseract (default value) implicitly = "pakai global". Tidak bisa bedain dari "user memang mau Tesseract per-profile". Acceptable: 99% user pilih non-default per profile. Kalo perlu eksplisit, tambah field `UseGlobalOcrEngine bool` di next iteration.
+
+---
+
 ## Done when Fase 6 selesai
 
-- `dotnet test` green (91+ existing + minimal 3 baru dari T84) — **96/96 ✅**
+- `dotnet test` green (91+ existing + minimal 3 baru dari T84) — **99/99 ✅** (3 T87 tests added)
 - Manual smoke test di Dragon's Dogma: pilih "Paddle OCR" di Settings, capture region, dialog baru muncul <500ms end-to-end — **T80 spike validated warm median 103ms; well under budget**
 - Akurasi PaddleOCR > Tesseract untuk subtitle stylized (visual check, no formal benchmark) — **belum divalidasi di hardware user, defer ke smoke test**
 - Settings ComboBox expose 3 engine: Tesseract, Vision AI, Paddle OCR — **✅**
