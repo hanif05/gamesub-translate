@@ -292,25 +292,38 @@ public partial class MainWindow : Window
         var region = _service.ActiveRegion();
         if (region is null) { SetStatus("No active region — pick a profile first."); return null; }
 
+        // F87: profile overrides settings for OCR engine + Paddle GPU toggle. Per-game
+        // override is the whole point of having profiles — pre-Fase 6 the engine choice
+        // in ProfileEditWindow was silently ignored, which made the per-profile OCR
+        // picker a dead control. Active profile (always set when region is set, per
+        // ProfileService invariants) supplies the override; settings stay the fallback.
+        var activeProfile = _service.ActiveProfile;
+        var effectiveEngine = activeProfile?.OcrEngine ?? _settings.OcrEngine;
+        var effectivePaddleGpu = activeProfile?.PaddleUseGpu ?? _settings.PaddleUseGpu;
+        // Source/Target lang follow the same override pattern — T52 already used profile langs.
+        var effectiveSource = activeProfile?.SourceLang ?? _settings.SourceLang;
+        var effectiveTarget = activeProfile?.TargetLang ?? _settings.TargetLang;
+        // Per-game capture interval is a separate profile field; keep using it (was already wired).
+        var effectiveInterval = activeProfile?.CaptureIntervalMs ?? _settings.CaptureIntervalMs;
+
         var cfg = new AppConfig
         {
             ApiKey = _settings.ApiKey,
             BaseUrl = _settings.BaseUrl,
             Model = _settings.Model,
             VisionModel = _settings.VisionModel,
-            SourceLang = _settings.SourceLang,
-            TargetLang = _settings.TargetLang,
+            SourceLang = effectiveSource,
+            TargetLang = effectiveTarget,
             Providers = _settings.Providers,
-            // F82: propagate Paddle GPU toggle so the factory wires PaddleOcrEngine correctly.
-            PaddleUseGpu = _settings.PaddleUseGpu,
+            PaddleUseGpu = effectivePaddleGpu,
         };
         if (!cfg.TranslationEnabled) { SetStatus("Translation not configured — set API key in Settings."); return null; }
 
-        // T38: engine chosen from settings (Tesseract vs Vision AI). VisionAI needs a
-        // configured provider; factory falls back to Tesseract if that's missing.
-        var ocr = OcrEngineFactory.Create(_settings.OcrEngine, cfg);
+        // T38: engine chosen via effective override chain. VisionAI needs a configured
+        // provider; factory falls back to Tesseract if that's missing.
+        var ocr = OcrEngineFactory.Create(effectiveEngine, cfg);
         _pipeline = TranslatePipeline.ForEnvironment(
-            region.X, region.Y, region.Width, region.Height, _settings.CaptureIntervalMs,
+            region.X, region.Y, region.Width, region.Height, effectiveInterval,
             ocr, cfg, cache: new TranslationCacheRepository(_db),
             onTranslated: t => Dispatcher.Invoke(() =>
             {
