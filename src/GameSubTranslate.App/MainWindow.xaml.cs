@@ -322,6 +322,7 @@ public partial class MainWindow : Window
         // T38: engine chosen via effective override chain. VisionAI needs a configured
         // provider; factory falls back to Tesseract if that's missing.
         var ocr = OcrEngineFactory.Create(effectiveEngine, cfg);
+        _logger?.Info("Pipeline", $"engine={effectiveEngine} gpu={(effectivePaddleGpu ? "on" : "off")} src={effectiveSource} tgt={effectiveTarget} interval={effectiveInterval}ms");
         _pipeline = TranslatePipeline.ForEnvironment(
             region.X, region.Y, region.Width, region.Height, effectiveInterval,
             ocr, cfg, cache: new TranslationCacheRepository(_db),
