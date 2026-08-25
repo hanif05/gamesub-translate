@@ -69,6 +69,7 @@
             <ComboBox Grid.Row="4" Grid.Column="1" x:Name="OcrEngineBox" Margin="0,4">
                 <ComboBoxItem Content="Tesseract" Tag="Tesseract"/>
                 <ComboBoxItem Content="Vision AI" Tag="VisionAi"/>
+                <ComboBoxItem Content="Paddle OCR" Tag="PaddleOcr"/>
             </ComboBox>
 
             <TextBlock Grid.Row="5" Grid.Column="0" Text="Capture interval (ms)" VerticalAlignment="Center" Margin="0,4"/>
