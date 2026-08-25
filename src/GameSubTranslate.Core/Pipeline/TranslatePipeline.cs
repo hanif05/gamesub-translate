@@ -72,7 +72,7 @@ public sealed class TranslatePipeline : IDisposable
         Action<string> onTranslated,
         Action<string>? onToken = null, Action? onStreamStart = null, Action? onStreamEnd = null,
         FileLogger? logger = null,
-        int idleIntervalMs = 3000, int idleThreshold = 3, int idleWindowMs = 5000)
+        int idleIntervalMs = 1500, int idleThreshold = 3, int idleWindowMs = 5000)
     {
         _capture = capture;
         _ocr = ocr;
@@ -94,7 +94,7 @@ public sealed class TranslatePipeline : IDisposable
         IOcrEngine ocr, AppConfig cfg, TranslationCacheRepository? cache, Action<string> onTranslated,
         Action<string>? onToken = null, Action? onStreamStart = null, Action? onStreamEnd = null,
         FileLogger? logger = null,
-        int idleIntervalMs = 3000, int idleThreshold = 3, int idleWindowMs = 5000)
+        int idleIntervalMs = 1500, int idleThreshold = 3, int idleWindowMs = 5000)
     {
         TranslationClient? translator = null;
         if (cfg.TranslationEnabled)
